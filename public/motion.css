@@ -62,8 +62,6 @@ dialog[open] { animation: dialog-in var(--motion-duration) cubic-bezier(.2,.75,.
 #account-form button { margin-top: .85rem; }
 #account-status { min-height: 1.5em; }
 #account-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
-#temporary { font-size: .8rem; padding-inline: .4rem; }
-#temporary[aria-pressed="true"] { border-color: var(--line); }
 #studio-skeleton {
   margin-block: 12px;
   aspect-ratio: 2.7;
@@ -110,7 +108,6 @@ dialog[open] { animation: dialog-in var(--motion-duration) cubic-bezier(.2,.75,.
     transform: translateY(0);
     transition-timing-function: ease, ease, step-start;
   }
-  #temporary { max-width: 85px; line-height: 1.15; }
 }
 :root[data-motion="off"] { --motion-duration: 0ms; }
 :root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after {

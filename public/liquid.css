@@ -54,7 +54,7 @@ body {
   position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 var(--glint), inset 0 -1px 0 var(--prism), 0 2px 6px var(--abyss), 0 10px 24px var(--abyss);
+  box-shadow: inset 0 1px 0 var(--glint), inset 0 -1px 0 var(--prism), 0 5px 16px var(--abyss);
 }
 @supports (background: color-mix(in srgb, white 50%, transparent)) {
   :root:not([data-glass-tier="opaque"]) .liquid-glass {
@@ -76,38 +76,37 @@ body {
 .shell.collapsed { column-gap: 0; }
 aside.liquid-glass {
   padding: 21px 14px max(16px, env(safe-area-inset-bottom));
-  border-radius: 22px;
+  border-radius: var(--radius-panel);
   min-width: 0;
 }
 .top.liquid-glass {
   min-height: 56px;
   padding: 5px 12px;
-  border-radius: 18px;
+  border-radius: var(--radius-popover);
 }
 .top #chat-title { letter-spacing: -.022em; }
 .top #collapse { min-width: 44px; }
 #composer.liquid-glass {
-  border-radius: 23px;
+  border-radius: var(--radius-composer);
   padding: 8px;
   transition: border-color 140ms ease;
 }
 #composer:focus-within {
   border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
-  box-shadow: inset 0 1px 1px var(--glint), 0 0 0 3px var(--prism), 0 12px 30px var(--abyss);
 }
 @supports (field-sizing: content) { #prompt { field-sizing: content; min-height: 56px; max-height: 170px; } }
 #mode.liquid-glass { box-shadow: inset 0 1px 0 var(--glint); }
-#status.liquid-glass { border-radius: 99px; padding: 3px 9px; }
+#status.liquid-glass { border-radius: var(--radius-pill); padding: 3px 9px; }
 #status:empty { display: none; }
 #usage { color: var(--muted); font-size: .72rem; margin: 4px 5px; line-height: 1.35; }
 #usage[data-near] { color: var(--ink); font-weight: 650; }
 .toolbar button { transition: background-color 170ms ease, transform 170ms var(--spring), color 170ms ease; }
 .dialog-actions { position: sticky; bottom: -24px; z-index: 1; padding-top: .55rem; }
-.welcome h1 { font-size: clamp(2.4rem, 5.5vw, 4.65rem); letter-spacing: -.055em; }
+.welcome h1 { font-size: clamp(2rem, 5vw, 4.15rem); letter-spacing: -.05em; margin: .65em 0 .28em; }
 .welcome p { max-width: 35ch; margin-inline: auto; }
 .messages { font-size: var(--chat-type); line-height: 1.64; }
 .messages article { min-width: 0; }
-.history button[aria-current="true"] { box-shadow: inset 2px 0 var(--accent); }
+
 :root[data-density="compact"] .messages { gap: 14px; }
 :root[data-density="compact"] .history { margin-top: 12px; }
 :root[data-rail="solid"] aside.liquid-glass { background: var(--side); }
@@ -179,6 +178,8 @@ aside.liquid-glass {
   .atmosphere::after { display: none; }
 }
 dialog.liquid-glass { position: fixed; }
+.suggestions button.liquid-glass { box-shadow: inset 0 1px 0 var(--glint); }
+.suggestions button.liquid-glass:hover { background: var(--hover); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-effective-theme]) { --canvas: #151525; }
 }

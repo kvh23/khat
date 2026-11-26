@@ -21,23 +21,30 @@
       <div class="history">
         <div class="history-tools">
           <label class="sr-only" for="history-search" data-label="searchHistory">Search conversations</label>
-          <input id="history-search" type="search" autocomplete="off">
-          <button type="button" id="archives" aria-pressed="false" data-label="archive">Archive</button>
+          <div class="history-search"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/></svg><input id="history-search" type="search" autocomplete="off"></div>
+          <button type="button" id="archives" class="icon-button" aria-pressed="false" aria-label="Archive" title="Archive"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9m-9 4h4"/></svg></button>
         </div>
         <h2 data-label="history">History</h2>
         <ul id="history"></ul>
         <p id="no-history" data-label="noHistory">Your conversations will appear here.</p>
       </div>
-      <button type="button" id="settings" class="settings"><span aria-hidden="true">⚙</span><span data-label="settings">Settings</span></button>
-      <button type="button" id="admin-open" class="side-button" data-label="admin" hidden>Administration</button>
-      <button type="button" id="lock" class="side-button" aria-label="Lock profile"><img id="account-avatar" alt="" hidden><span id="profile-name"></span></button>
+      <div class="side-actions">
+        <button type="button" id="settings" class="settings"><span aria-hidden="true">⚙</span><span data-label="settings">Settings</span></button>
+        <button type="button" id="admin-open" class="side-button" data-label="admin" hidden>Administration</button>
+        <button type="button" id="lock" class="side-button" aria-label="Lock profile"><img id="account-avatar" alt="" hidden><span id="profile-name"></span></button>
+      </div>
     </aside>
     <main>
       <header class="top">
-        <button type="button" class="menu" id="menu" aria-controls="sidebar" aria-expanded="false"><span aria-hidden="true">☰</span><span data-label="menu">Menu</span></button>
-        <button type="button" id="collapse" aria-controls="sidebar" aria-expanded="true" data-label="collapse">Hide sidebar</button>
-        <span id="chat-title">New chat</span>
-        <button type="button" id="temporary" aria-pressed="false" data-label="temporary" hidden>Temporary chat</button>
+        <button type="button" class="menu icon-button" id="menu" aria-controls="sidebar" aria-expanded="false" aria-label="Show sidebar" title="Show sidebar"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9 5v14"/></svg></button>
+        <button type="button" id="collapse" class="icon-button" aria-controls="sidebar" aria-expanded="true" aria-label="Hide sidebar" title="Hide sidebar"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9 5v14"/></svg></button>
+        <div class="conversation-heading">
+          <div class="conversation-label">
+            <span id="chat-title">New chat</span>
+            <button type="button" id="temporary" aria-pressed="false" hidden><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4 3 7.5 7 10 4-2.5 7-6 7-10V6z"/><path d="M9.5 12l1.5 1.5 3.5-3.5"/></svg><span data-label="temporary">Temporary chat</span></button>
+          </div>
+          <p id="temporary-note" data-label="temporaryNotice" hidden>This chat won’t appear in history or use or create memories.</p>
+        </div>
         <div class="orb orb-small" aria-hidden="true"><i></i><i></i><i></i></div>
         <button type="button" id="language" class="language" aria-label="Switch language">DA</button>
       </header>

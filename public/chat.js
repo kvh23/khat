@@ -161,11 +161,17 @@ function applyVisual(visual) {
   appliedVisual = Object.fromEntries(Array.from(appearanceControls.values(), key => [key, visual[key]]));
 }
 
+function labelIcon(id, label) {
+  const button = byId(id);
+  button.title = label;
+  button.setAttribute("aria-label", label);
+}
+
 function appearance() {
   applyVisual(preferences.open ? previewVisual() : state);
   shell.classList.toggle("collapsed", state.collapsed);
   byId("collapse").setAttribute("aria-expanded", String(!state.collapsed));
-  byId("collapse").textContent = state.collapsed ? labels.expand : labels.collapse;
+  labelIcon("collapse", state.collapsed ? labels.expand : labels.collapse);
 }
 
 async function showProfiles(showCreate = false) {
@@ -502,6 +508,7 @@ function current() {
 function closeMenu() {
   byId("sidebar").classList.remove("open");
   byId("menu").setAttribute("aria-expanded", "false");
+  labelIcon("menu", labels.expand);
 }
 
 let historyRows = [];
@@ -509,6 +516,13 @@ function renderHistory() {
   const chat = current();
   const title = chat?.title || labels.newChat;
   const titleLabel = byId("chat-title");
+  titleLabel.hidden = Boolean(temporary);
+  byId("temporary-note").hidden = !temporary;
+  shell.toggleAttribute("data-temporary", Boolean(temporary));
+  const temporaryButton = byId("temporary");
+  temporaryButton.setAttribute("aria-pressed", String(Boolean(temporary)));
+  if (temporary) temporaryButton.setAttribute("aria-describedby", "temporary-note");
+  else temporaryButton.removeAttribute("aria-describedby");
   if (titleLabel.textContent !== title) titleLabel.textContent = title;
   const query = byId("history-search").value.trim().toLocaleLowerCase();
   const entries = state.chats.filter(entry => Boolean(entry.archived) === archives &&
@@ -767,6 +781,8 @@ function renderLanguage() {
   accountForm();
   if (vault?.account) preferences.querySelector("[data-label=privacy]").textContent = labels.accountPrivacy;
   byId("history-search").placeholder = labels.searchHistory;
+  labelIcon("archives", labels.archive);
+  labelIcon("menu", byId("menu").getAttribute("aria-expanded") === "true" ? labels.collapse : labels.expand);
   appearance();
   byId("sidebar").setAttribute("aria-label", labels.history);
   timeline.setAttribute("aria-label", labels.conversation);
@@ -782,10 +798,9 @@ function renderLanguage() {
   report(notice);
 }
 
-function openChat(id) {
+function openChat(id, isTemporary = false) {
   cancelCapture?.();
-  temporary = undefined;
-  byId("temporary").setAttribute("aria-pressed", "false");
+  temporary = isTemporary ? { id: crypto.randomUUID(), messages: [] } : undefined;
   state.active = id;
   prompt.value = "";
   fitPrompt();
@@ -843,17 +858,14 @@ editDialog.addEventListener("close", () => {
   if (editDialog.returnValue === "send") submitChat(byId("edit-text").value.trim(), editing);
 });
 byId("temporary").addEventListener("click", () => {
-  const next = !temporary;
-  openChat(null);
-  if (next) temporary = { id: crypto.randomUUID(), title: labels.temporary, messages: [] };
-  byId("temporary").setAttribute("aria-pressed", String(next));
-  renderHistory();
-  report(next ? "temporaryNotice" : "");
+  openChat(null, !temporary);
+  byId("temporary").focus();
 });
 byId("new").addEventListener("click", () => openChat(null));
 byId("menu").addEventListener("click", () => {
   const open = byId("sidebar").classList.toggle("open");
   byId("menu").setAttribute("aria-expanded", String(open));
+  labelIcon("menu", open ? labels.collapse : labels.expand);
 });
 byId("language").addEventListener("click", () => {
   cancelCapture?.();
@@ -1184,7 +1196,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
   const previous = current();
   const chat = previous ?? { id: crypto.randomUUID(), title: content.replace(/\s+/g, " ").slice(0, 64), messages: [] };
   if (!previous) state.chats.unshift(chat);
-  state.active = chat.id;
+  if (!temporary) state.active = chat.id;
   const previousMessages = chat.messages.slice();
   if (replaceFrom >= 0) chat.messages.length = replaceFrom;
   chat.messages.push(regenerate ? previousMessages[replaceFrom] : {
@@ -1214,7 +1226,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
       signal: controller.signal,
       body: JSON.stringify({
         messages: modelHistory(chat.messages, 48000 - textFiles.reduce((sum, file) => sum + file.text.length, 0)),
-        personality: state.personality, memory: state.memoryEnabled ? state.memory : "",
+        personality: state.personality, memory: state.memoryEnabled && !temporary ? state.memory : "",
         aiName: state.aiName, instructions: state.instructions, style: state.style, length: state.length,
         language: state.language, mode: state.mode, files: textFiles, ...(vision && { vision }), search, temporary: Boolean(temporary),
       }),
