@@ -91,7 +91,7 @@ const assert = require('node:assert/strict');
     await button('Old private chat').waitFor();
     await button('Hide sidebar').click();
     await page.locator('#sidebar').waitFor({ state: 'hidden' });
-    await button('Vis sidepanelet').click();
+    await button('Show sidebar').click();
     await button('Settings').click();
     const settings = page.locator('#preferences');
     assert.equal(await settings.getByLabel('Memory', { exact: true }).inputValue(), 'Migrated note');
