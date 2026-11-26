@@ -560,3 +560,49 @@ dialog.liquid-glass::backdrop { background: var(--dialog-backdrop); }
 @media (forced-colors: active) {
   dialog.liquid-glass, #model-options.liquid-glass { background: Canvas; }
 }
+
+:root[data-rail="glass"]:not([data-glass-tier="opaque"]) #preferences.liquid-glass {
+  --dialog-material: color-mix(in srgb, var(--panel) var(--glass-opacity), transparent);
+}
+:root[data-rail="glass"]:not([data-glass-tier="opaque"]) #preferences.liquid-glass[open]::backdrop {
+  background: #0b0b15a8;
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+#preferences [role="tab"][aria-selected="true"] {
+  color: var(--ink);
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px var(--accent);
+}
+#preferences [role="tabpanel"] { min-width: 0; }
+#preferences .settings-slider { display: flex; align-items: center; gap: 12px; max-width: 340px; }
+#preferences .settings-slider output { min-width: 56px; text-align: end; font-variant-numeric: tabular-nums; }
+#preferences .settings-glass-preview {
+  display: grid; align-items: center; max-width: 240px; height: 52px; padding: 6px;
+  border-radius: var(--radius-input);
+  background: repeating-linear-gradient(110deg, var(--side) 0 14px, var(--accent-soft) 14px 28px);
+}
+#preferences .settings-glass-preview span {
+  height: 100%; border-radius: var(--radius-control); background: var(--dialog-material);
+}
+:root:not([data-glass-tier="opaque"]) #preferences .settings-glass-preview span {
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+#preferences .settings-danger { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
+#preferences .settings-danger h3 { font-size: .95rem; }
+#preferences #choose-avatar { background: var(--side); }
+#preferences #avatar-filename { font-size: .8rem; overflow-wrap: anywhere; }
+#preferences #settings-status { margin: 0 auto 0 0; font-size: .8rem; }
+#preferences .check input[type=checkbox] {
+  appearance: none; width: 32px; height: 19px; flex: 0 0 auto;
+  border: 1px solid var(--muted); border-radius: var(--radius-pill);
+  background: radial-gradient(circle at 8px center, var(--muted) 5px, transparent 5.5px), var(--side);
+}
+#preferences .check input[type=checkbox]:checked {
+  border-color: var(--accent);
+  background: radial-gradient(circle at calc(100% - 8px) center, var(--on-accent) 5px, transparent 5.5px), var(--accent);
+}
+@media (forced-colors: active) {
+  #preferences .check input[type=checkbox] { appearance: auto; }
+}

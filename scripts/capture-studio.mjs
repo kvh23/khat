@@ -61,6 +61,7 @@ try {
       await capture("admin");
       await page.locator("#admin").getByRole("button", { name: "Close" }).click();
       await page.locator("#settings").click();
+      if (await page.locator("#tab-appearance-settings").count()) await page.locator("#tab-appearance-settings").click();
       await capture("settings");
       await page.locator("#rail").selectOption("solid");
       await page.waitForFunction(() => document.documentElement.dataset.rail === "solid");

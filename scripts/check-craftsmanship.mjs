@@ -104,6 +104,7 @@ try {
 
     if (mobile || await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
     await page.locator("#settings").click();
+      if (await page.locator("#tab-appearance-settings").count()) await page.locator("#tab-appearance-settings").click();
     const dialog = page.locator("#preferences");
     const settings = dialog.locator(".preferences-content");
     const actions = dialog.locator(".preferences-actions");
@@ -115,6 +116,7 @@ try {
     await shot("settings-bottom");
     await dialog.locator('[value="cancel"]').last().click();
     await page.locator("#settings").click();
+      if (await page.locator("#tab-appearance-settings").count()) await page.locator("#tab-appearance-settings").click();
     await dialog.locator("#theme").selectOption("light");
     await dialog.locator("#accent").selectOption("custom");
     await dialog.locator("#custom-accent").fill("#6351ad");

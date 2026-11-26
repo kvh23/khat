@@ -240,3 +240,16 @@ Object.assign(translations.da, {
   studioResult: "Resultat",
   studioNoResult: "Opret et billede for at se det her.",
 });
+
+Object.assign(translations.en, {
+  chooseAvatar: "Choose picture", accountDeletion: "Account deletion",
+  memoryDisabledHelp: "Turning memory off keeps your saved memories. Khat won’t use or add memories while it’s off.",
+  confirmClearMemory: "Clear all memories? The change takes effect when you select Save.",
+  instructionExample: "For example: Answer in Danish and explain unfamiliar terms.",
+});
+Object.assign(translations.da, {
+  chooseAvatar: "Vælg billede", accountDeletion: "Sletning af konto",
+  memoryDisabledHelp: "Dine gemte minder bevares, når hukommelsen er slået fra. Khat bruger eller tilføjer ingen minder, mens den er slået fra.",
+  confirmClearMemory: "Vil du rydde alle minder? Ændringen træder i kraft, når du vælger Gem.",
+  instructionExample: "Eksempel: Svar på dansk, og forklar ukendte fagudtryk.",
+});

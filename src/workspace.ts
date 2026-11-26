@@ -10,7 +10,7 @@ const options: Record<string, string[]> = {
 	mode: ["auto", "instant", "think", "pro"], orbStyle: ["minimal", "fluid", "aurora", "classic", "intelligence"],
 	density: ["comfortable", "compact"], rail: ["glass", "solid"],
 };
-const stringLimits: Record<string, number> = { aiName: 40, displayName: 40, personality: 1000, instructions: 2000 };
+const stringLimits: Record<string, number> = { aiName: 40, displayName: 40, personality: 1000, instructions: 3002 };
 const bools = ["collapsed", "memoryEnabled", "motionEnabled", "ambience"];
 
 function sanitizePreferences(value: unknown) {
