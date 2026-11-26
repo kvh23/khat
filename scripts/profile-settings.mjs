@@ -65,7 +65,7 @@ try {
     await preview.scrollIntoViewIfNeeded();
     await preview.locator(".orb").waitFor();
     await page.waitForFunction(() => document.querySelector(".personal-preview").hasAttribute("data-visible"));
-    await dialog.evaluate(element => { element.scrollTop = 0; });
+    await dialog.locator(".preferences-content").evaluate(element => { element.scrollTop = 0; });
     await dialog.locator("#theme").selectOption(mobile ? "dark" : "light");
     await page.waitForFunction(dark => document.documentElement.dataset.theme === (dark ? "dark" : "light"), mobile);
     await page.waitForFunction(() => !document.querySelector(".personal-preview").hasAttribute("data-visible"));

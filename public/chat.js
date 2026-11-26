@@ -17,6 +17,8 @@ const send = byId("send");
 const stop = byId("stop");
 const status = byId("status");
 const preferences = byId("preferences");
+const modelButton = byId("mode");
+const modelOptions = byId("model-options");
 const confirmDelete = byId("confirm");
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const deviceLanguage = navigator.language.toLowerCase().startsWith("da") ? "da" : "en";
@@ -55,7 +57,7 @@ const appearanceControls = new Map(Object.keys(visualDefaults).map(key => {
 const settingsOrb = preferences.querySelector(".personal-preview");
 const previewObserver = new IntersectionObserver(([entry]) => {
   settingsOrb.toggleAttribute("data-visible", preferences.open && entry.isIntersecting);
-}, { root: preferences });
+}, { root: preferences.querySelector(".preferences-content") });
 let previewFrame = 0;
 let appliedVisual;
 const modelNames = { instant: "Khat Instant", think: "Khat Think", pro: "Khat Pro", legacy: "Llama 3.3 70B", instantClassic: "Llama 3.1 8B", thinkClassic: "Qwen3 30B" };
@@ -215,7 +217,7 @@ function enterProfile(session) {
   byId("temporary").hidden = !session.account;
   byId("temporary").setAttribute("aria-pressed", "false");
   byId("admin-open").hidden = session.account?.role !== "admin";
-  byId("mode").value = state.mode;
+  renderModel();
   byId("history-search").value = "";
   byId("archives").setAttribute("aria-pressed", "false");
   byId("search").setAttribute("aria-pressed", "false");
@@ -386,7 +388,7 @@ async function syncWorkspace() {
       const updated = apply();
       if (!updated) return;
       state = { ...state, ...updated };
-      byId("mode").value = state.mode;
+      renderModel();
       refreshIdentity();
       renderLanguage();
     }
@@ -769,6 +771,8 @@ function updateControls() {
 function renderLanguage() {
   labels = translations[state.language];
   document.documentElement.lang = state.language;
+  renderModel();
+  labelIcon("preferences-close", labels.close);
   document.querySelectorAll("[data-label]").forEach(element => {
     element.textContent = labels[element.dataset.label];
   });
@@ -818,17 +822,42 @@ function openChat(id, isTemporary = false) {
 
 systemDark.addEventListener("change", appearance);
 byId("collapse").addEventListener("click", () => {
-  const prior = timeline.getBoundingClientRect().left;
   state.collapsed = !state.collapsed;
   appearance();
-  const shift = prior - timeline.getBoundingClientRect().left;
-  if (shift) animate(timeline, [{ transform: `translateX(${shift}px)`, opacity: .82 }, { transform: "none", opacity: 1 }], 180);
-  if (!state.collapsed) animate(byId("sidebar"), [{ transform: "translateX(-12px)", opacity: .4 }, { transform: "none", opacity: 1 }], 180);
   persist();
 });
-byId("mode").addEventListener("change", event => {
-  state.mode = event.currentTarget.value;
+function renderModel() {
+  const selected = modelOptions.querySelector(`input[value="${state.mode}"]`) ?? modelOptions.querySelector("input");
+  selected.checked = true;
+  byId("mode-value").textContent = modelNames[selected.value] ?? labels.auto;
+  modelButton.setAttribute("aria-label", `${labels.model}: ${byId("mode-value").textContent}`);
+}
+function setModelMenu(open, restoreFocus = false) {
+  modelOptions.hidden = !open;
+  modelButton.setAttribute("aria-expanded", String(open));
+  if (open) modelOptions.querySelector("input:checked")?.focus();
+  else if (restoreFocus) modelButton.focus();
+}
+modelButton.addEventListener("click", () => setModelMenu(modelOptions.hidden));
+modelOptions.addEventListener("change", event => {
+  state.mode = event.target.value;
+  renderModel();
   persist();
+});
+modelOptions.addEventListener("click", event => {
+  if (event.target.matches("input")) setModelMenu(false, true);
+});
+modelOptions.addEventListener("keydown", event => {
+  if (event.key === "Escape" || event.key === "Enter") {
+    event.preventDefault();
+    setModelMenu(false, true);
+  }
+});
+modelButton.parentElement.addEventListener("focusout", event => {
+  if (!modelButton.parentElement.contains(event.relatedTarget)) setModelMenu(false);
+});
+document.addEventListener("click", event => {
+  if (!modelOptions.hidden && !modelButton.parentElement.contains(event.target)) setModelMenu(false);
 });
 byId("history-search").addEventListener("input", renderHistory);
 byId("archives").addEventListener("click", event => {
@@ -915,6 +944,7 @@ byId("settings").addEventListener("click", () => {
   preferences.returnValue = "";
   document.documentElement.setAttribute("data-settings-open", "");
   preferences.showModal();
+  preferences.querySelector(".preferences-content").scrollTop = 0;
   previewObserver.observe(settingsOrb);
 });
 byId("remove-avatar").addEventListener("click", () => {
