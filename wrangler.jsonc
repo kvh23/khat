@@ -5,6 +5,13 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "khat",
+	"vars": { "ACCOUNTS_REQUIRED": "true" },
+	"d1_databases": [{
+		"binding": "DB",
+		"database_name": "khat-accounts",
+		"database_id": "c746c800-3a9f-4cbe-af5d-315bb8363a65",
+		"migrations_dir": "migrations"
+	}],
 	"main": "src/index.ts",
 	"compatibility_date": "2025-10-08",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
