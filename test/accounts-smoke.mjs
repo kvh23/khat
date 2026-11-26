@@ -210,6 +210,7 @@ try {
     });
     await button("Settings").click();
     await label("Display name").fill("Khat friend");
+    await label("Custom instructions").fill("Mit navn er tjek.");
     await label("Profile picture").setInputFiles({
       name: "avatar.jpg", mimeType: "image/jpeg", buffer: Buffer.from(image, "base64"),
     });
@@ -228,9 +229,10 @@ try {
     assert.equal(await page.getByText("Temporary chat", { exact: true }).filter({ visible: true }).count(), 1);
     assert.equal(await page.locator("#temporary-note").isVisible(), true);
     assert.equal(await page.locator("#chat-title").isVisible(), false);
-    await send("Temporarily remember that I prefer concise answers");
+    await send("hvad er mit navn?");
     assert.equal(expected.at(-1).temporary, true);
-    assert.equal(expected.at(-1).memory, "");
+    assert.equal(expected.at(-1).memory, undefined);
+    assert.equal(expected.at(-1).instructions, undefined);
     const afterTemporary = await read(admin);
     assert.deepEqual(afterTemporary.chats, beforeTemporary.chats);
     assert.deepEqual(afterTemporary.memories, beforeTemporary.memories);
@@ -240,7 +242,7 @@ try {
     await button("Temporary chat").click();
     assert.equal(await page.locator("#temporary-note").isVisible(), false);
     assert.equal(await page.locator("#chat-title").isVisible(), true);
-    assert.equal(await page.getByText("Temporarily remember", { exact: false }).count(), 0);
+    assert.equal(await page.getByText("hvad er mit navn?", { exact: true }).count(), 0);
     const savedReply = page.waitForResponse(response => response.url().endsWith("/api/workspace") &&
       response.request().method() === "POST" && response.status() === 204);
     await send("Remember that I prefer concise answers");
@@ -249,6 +251,8 @@ try {
     const saved = await read(admin);
     assert.equal(saved.memories[0].content, "I prefer concise answers.");
     assert.equal(saved.chats.some(item => item.title.startsWith("Temporarily")), false);
+    assert.equal(saved.preferences.instructions, "Mit navn er tjek.");
+    assert.equal(saved.preferences.displayName, "Khat friend");
     assert.equal(saved.preferences.orbStyle, "aurora");
     assert.equal(saved.preferences.orbOne, "#446688");
     assert.match(saved.preferences.avatar, /^data:image\/jpeg;base64,/);

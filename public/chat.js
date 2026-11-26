@@ -67,6 +67,7 @@ let vault;
 let accountsMode = false;
 let registering = false;
 let temporary;
+let savingSettings = false;
 let avatarDraft;
 let memoryDraft;
 let syncing = false;
@@ -658,7 +659,7 @@ function messageElement(message, streamed = false, index = -1) {
     element.append(actions);
     return element;
   }
-  const heading = node("div", state.aiName || "Khat", "message-label");
+  const heading = node("div", (!temporary && state.aiName) || "Khat", "message-label");
   if (Object.hasOwn(modelNames, message.model)) {
     heading.append(node("span", modelNames[message.model], "model-label"));
   }
@@ -757,12 +758,12 @@ function updateControls() {
   voiceControls();
   timeline.setAttribute("aria-busy", String(Boolean(pending)));
   for (const id of ["mode", "lock", "studio-open", "temporary", "admin-open"]) byId(id).disabled = Boolean(pending);
-  send.disabled = !prompt.value.trim() || loadingFiles;
+  send.disabled = !prompt.value.trim() || loadingFiles || savingSettings;
   send.hidden = Boolean(pending);
   stop.hidden = !pending;
   prompt.disabled = Boolean(pending);
   byId("language").disabled = Boolean(pending);
-  byId("settings").disabled = Boolean(pending);
+  byId("settings").disabled = Boolean(pending) || savingSettings;
   byId("search").disabled = Boolean(pending);
   byId("attach").disabled = Boolean(pending) || loadingFiles;
   byId("voice").disabled = !Recognition || Boolean(pending);
@@ -1015,8 +1016,12 @@ preferences.addEventListener("close", async () => {
   refreshIdentity();
   appearance();
   if (nameChanged) renderMessages();
-  report("saved");
-  persist();
+  savingSettings = true;
+  updateControls();
+  const saved = await persist();
+  savingSettings = false;
+  updateControls();
+  if (saved && vault === session) report("saved");
 });
 confirmDelete.addEventListener("close", () => {
   if (confirmDelete.returnValue !== "delete") return;
@@ -1181,7 +1186,7 @@ function fitPrompt() {
 
 prompt.addEventListener("input", () => {
   fitPrompt();
-  send.disabled = !prompt.value.trim() || loadingFiles;
+  send.disabled = !prompt.value.trim() || loadingFiles || savingSettings;
 });
 prompt.addEventListener("keydown", event => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing && window.matchMedia("(pointer: fine)").matches) {
@@ -1215,7 +1220,7 @@ byId("composer").addEventListener("submit", event => {
 });
 
 async function submitChat(content, replaceFrom = -1, regenerate = false) {
-  if (!content || pending || loadingFiles || syncing) return;
+  if (!content || pending || loadingFiles || syncing || savingSettings) return;
   cancelCapture?.();
   stopSpeech();
   const controller = new AbortController();
@@ -1256,8 +1261,10 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
       signal: controller.signal,
       body: JSON.stringify({
         messages: modelHistory(chat.messages, 48000 - textFiles.reduce((sum, file) => sum + file.text.length, 0)),
-        personality: state.personality, memory: state.memoryEnabled && !temporary ? state.memory : "",
-        aiName: state.aiName, instructions: state.instructions, style: state.style, length: state.length,
+        ...(!vault?.account && !temporary && {
+          personality: state.personality, memory: state.memoryEnabled ? state.memory : "",
+          aiName: state.aiName, instructions: state.instructions, style: state.style, length: state.length,
+        }),
         language: state.language, mode: state.mode, files: textFiles, ...(vision && { vision }), search, temporary: Boolean(temporary),
       }),
     });

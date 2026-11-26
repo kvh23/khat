@@ -121,7 +121,7 @@ Object.assign(translations.en, {
   importVault: "Import a local profile", importInfo: "This copies chats, memory, and Studio images into your account. Your local copy remains on this device.",
   noLocalProfiles: "No local profiles were found on this device.", imported: "Local conversations, memory, and available images imported.",
   importPartial: "Chats and memory were imported. Some images could not be copied. They remain in the local profile.",
-  temporary: "Temporary chat", temporaryNotice: "This chat won’t appear in history or use or create memories.",
+  temporary: "Temporary chat", temporaryNotice: "This chat stays out of history and skips profile details, custom instructions, and memory.",
   memoryPrivacy: "Khat can remember explicitly requested formatting and language preferences. Add interests and projects yourself. Avoid saving private identifiers or sensitive details.",
   addMemory: "Add memory", admin: "Administration", issueInvite: "Create single-use invite",
   inviteReady: "Copy this single-use code now. It expires in seven days.",
@@ -146,7 +146,7 @@ Object.assign(translations.da, {
   importVault: "Importér en lokal profil", importInfo: "Dette kopierer samtaler, hukommelse og studiebilleder til din konto. Din lokale kopi bliver på enheden.",
   noLocalProfiles: "Der blev ikke fundet lokale profiler på denne enhed.", imported: "Lokale samtaler, hukommelse og tilgængelige billeder er importeret.",
   importPartial: "Samtaler og hukommelse blev importeret. Nogle billeder kunne ikke kopieres og bliver i den lokale profil.",
-  temporary: "Midlertidig chat", temporaryNotice: "Denne chat vises ikke i historikken og bruger eller opretter ingen minder.",
+  temporary: "Midlertidig chat", temporaryNotice: "Denne chat gemmes ikke i historikken og bruger hverken profiloplysninger, brugerdefinerede instruktioner eller minder.",
   memoryPrivacy: "Khat kan huske format- og sprogpræferencer, du udtrykkeligt beder om. Tilføj selv interesser og projekter. Undgå at gemme følsomme oplysninger.",
   addMemory: "Tilføj et minde", admin: "Administration", issueInvite: "Opret engangsinvitation",
   inviteReady: "Kopiér engangskoden nu. Den udløber om syv dage.",
@@ -199,12 +199,16 @@ Object.assign(translations.da, {
 
 
 Object.assign(translations.en, {
+  profileHelp: "Khat uses your display name when relevant in regular chats.",
+  instructionsHelp: "These instructions guide replies in regular chats.",
   modeAuto: "Chooses a mode for your request",
   modeInstant: "Quick replies for everyday questions",
   modeThink: "More reasoning for detailed tasks",
   modePro: "For complex writing and analysis",
 });
 Object.assign(translations.da, {
+  profileHelp: "Khat bruger dit visningsnavn, når det er relevant i almindelige chats.",
+  instructionsHelp: "Disse instruktioner guider svar i almindelige chats.",
   modeAuto: "Vælger en tilstand til din forespørgsel",
   modeInstant: "Hurtige svar på hverdagsspørgsmål",
   modeThink: "Mere ræsonnering til detaljerede opgaver",

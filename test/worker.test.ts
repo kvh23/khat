@@ -235,6 +235,35 @@ describe("account memory and temporary chat", () => {
 		expect(JSON.stringify(f.run.mock.calls.at(-1))).not.toContain("learning about mountain photography");
 	});
 
+	it("sends saved name and instructions in the model prompt only in regular chats", async () => {
+		const f = fixture();
+		const first = vi.fn(async () => ({ preferences: JSON.stringify({
+			displayName: "Khat friend", instructions: "Mit navn er tjek.", aiName: "Khat",
+		}) }));
+		const prepare = vi.fn((sql: string) => ({
+			bind: (owner: string) => ({
+				first: sql.includes("JOIN accounts") ? async () => ({ id: "account-fixture" }) : () => {
+					expect(owner).toBe("account-fixture");
+					return first();
+				},
+			}),
+		}));
+		Object.assign(f.env, { DB: { prepare }, PASSWORDS: {} });
+		const headers = { cookie: `__Host-khat_session=${"X".repeat(43)}`, "x-khat-account": "account-fixture" };
+		const payload = { messages: [{ role: "user", content: "hvad er mit navn?" }], instructions: "untrusted replacement" };
+		for (const temporary of [false, true]) {
+			expect((await f.post({ ...payload, temporary }, headers)).status).toBe(200);
+			const input = f.run.mock.calls.at(-1)?.[1] as { messages: { role: string; content: string }[] };
+			const [system] = input.messages;
+			expect(system.role).toBe("system");
+			expect(system.content).toContain("appropriate for teens");
+			expect(system.content.includes("Mit navn er tjek.")).toBe(!temporary);
+			expect(system.content.includes("Khat friend")).toBe(!temporary);
+			expect(system.content).not.toContain("untrusted replacement");
+		}
+		expect(first).toHaveBeenCalledOnce();
+	});
+
 	it("only emits canonical opt-in memory suggestions for approved explicit preferences", async () => {
 		const { requestedMemory } = await import("../src/workspace");
 		expect(requestedMemory("Please remember that I prefer concise replies.")).toBe("I prefer concise answers.");
