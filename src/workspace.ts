@@ -122,10 +122,15 @@ function terms(text: string) {
 	return new Set((text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(word => word.length >= 4));
 }
 
-export async function memoryContext(db: D1Database, account: Account, prompt: string) {
-	const workspace = await db.prepare("SELECT preferences FROM workspaces WHERE owner=?").bind(account.id)
+export async function readPreferences(db: D1Database, owner: string) {
+	const workspace = await db.prepare("SELECT preferences FROM workspaces WHERE owner=?").bind(owner)
 		.first<{ preferences: string }>();
-	if (!workspace || JSON.parse(workspace.preferences).memoryEnabled !== true) return { enabled: false, context: "" };
+	return sanitizePreferences(workspace ? JSON.parse(workspace.preferences) : {}) ?? {};
+}
+
+export async function memoryContext(db: D1Database, account: Account, prompt: string, enabled: boolean) {
+	if (!enabled) return "";
+
 	// Browser commits memories with the conversation revision. Return suggestions separately.
 	const { results } = await db.prepare("SELECT content FROM memories WHERE owner=? LIMIT 40").bind(account.id).all<{ content: string }>();
 	const words = terms(prompt);
@@ -134,7 +139,7 @@ export async function memoryContext(db: D1Database, account: Account, prompt: st
 			content === "I prefer Danish answers." || content === "I prefer English answers." ? .5 : 0)
 			+ [...terms(content)].filter(word => words.has(word)).length,
 	})).filter(entry => entry.score).sort((a, b) => b.score - a.score).slice(0, 3).map(entry => entry.content).join("\n");
-	return { enabled: true, context };
+	return context;
 }
 
 export function requestedMemory(prompt: string) {

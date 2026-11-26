@@ -43,7 +43,7 @@
             <span id="chat-title">New chat</span>
             <button type="button" id="temporary" aria-pressed="false" hidden><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4 3 7.5 7 10 4-2.5 7-6 7-10V6z"/><path d="M9.5 12l1.5 1.5 3.5-3.5"/></svg><span data-label="temporary">Temporary chat</span></button>
           </div>
-          <p id="temporary-note" data-label="temporaryNotice" hidden>This chat won’t appear in history or use or create memories.</p>
+          <p id="temporary-note" data-label="temporaryNotice" hidden>This chat stays out of history and skips profile details, custom instructions, and memory.</p>
         </div>
         <div class="orb orb-small" aria-hidden="true"><i></i><i></i><i></i></div>
         <button type="button" id="language" class="language" aria-label="Switch language">DA</button>
@@ -106,7 +106,8 @@
       <p data-label="privacy">History and settings stay in this browser. Relevant chat text, memory, and attached text go to Workers AI when you send a message.</p>
       <fieldset id="account-preferences" hidden>
         <legend data-label="profile">Profile</legend>
-        <label for="display-name" data-label="displayName">Display name</label><input id="display-name" maxlength="40">
+        <label for="display-name" data-label="displayName">Display name</label><input id="display-name" maxlength="40" aria-describedby="profile-help">
+        <p id="profile-help" class="field-help" data-label="profileHelp"></p>
         <label for="avatar-file" data-label="profilePicture">Profile picture</label><input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp">
         <button type="button" id="remove-avatar" data-label="removeAvatar">Remove picture</button>
         <div><button id="export-account" type="button" data-label="exportAccount">Export account data</button></div>
@@ -156,7 +157,8 @@
       <label for="personality" data-label="personality">AI personality</label>
       <textarea id="personality" maxlength="1000" rows="3"></textarea>
       <label for="instructions" data-label="instructions">Custom instructions</label>
-      <textarea id="instructions" maxlength="2000" rows="3"></textarea>
+      <textarea id="instructions" maxlength="2000" rows="3" aria-describedby="instructions-help"></textarea>
+      <p id="instructions-help" class="field-help" data-label="instructionsHelp"></p>
       </fieldset>
       <fieldset>
       <legend data-label="memory">Memory</legend>
