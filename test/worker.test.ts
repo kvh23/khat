@@ -323,15 +323,30 @@ it("falls back to a cheaper model when Auto cannot reserve its first candidate",
 	expect(quota.mock.calls.map(([, init]) => JSON.parse(String(init.body)).kind)).toEqual(["text", "text"]);
 });
 
-it("applies real FLUX quality steps without bypassing either safety check", async () => {
+it("preserves screen content in enhanced prompts and checks both prompt versions and the result", async () => {
 	const f = fixture();
-	f.run.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ image: "/9j/eA==" })
+	const rewritten = "A silly monkey holds a phone with a banana pictured on its screen.";
+	f.run.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ response: rewritten })
+		.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ image: "/9j/eA==" })
 		.mockResolvedValueOnce({ response: "ALLOW" });
-	const response = await f.post({ prompt: "A small mountain cabin", style: "architecture", ratio: "wide", quality: "detail", enhance: true }, {}, "/api/image");
+	const prompt = "lav et fjollet billede af en abe med en telefon og en banan på skærmen af telefonen";
+	const response = await f.post({ prompt, style: "illustration", ratio: "wide", quality: "detail", enhance: true }, {}, "/api/image");
 	expect(response.status).toBe(200);
+	expect(f.run).toHaveBeenCalledTimes(5);
+	expect(JSON.stringify(f.run.mock.calls[0][1])).toContain(prompt);
+	expect(JSON.stringify(f.run.mock.calls[2][1])).toContain(rewritten);
+	expect(f.run.mock.calls[3][1]).toMatchObject({ steps: 8, prompt: expect.stringContaining(rewritten) });
+	expect(f.run.mock.calls[3][1]).toMatchObject({ prompt: expect.stringContaining("16:9") });
+	expect(JSON.stringify(f.run.mock.calls[4][1])).toContain("data:image/jpeg");
+	expect(JSON.parse(String(f.quota.mock.calls[0][1].body))).toEqual({ kind: "image", neurons: 600 });
+});
+
+it("does not generate when the revised image prompt is blocked", async () => {
+	const f = fixture();
+	f.run.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ response: "Rewritten scene" })
+		.mockResolvedValueOnce({ response: "BLOCK" });
+	expect((await f.post({ prompt: "A cabin", style: "plain", ratio: "square", enhance: true }, {}, "/api/image")).status).toBe(422);
 	expect(f.run).toHaveBeenCalledTimes(3);
-	expect(f.run.mock.calls[1][1]).toMatchObject({ steps: 8, prompt: expect.stringContaining("16:9") });
-	expect(f.run.mock.calls[1][1]).toMatchObject({ prompt: expect.stringContaining("visual hierarchy") });
 });
 
 it("checks an attached image before routing vision to Gemma 4", async () => {

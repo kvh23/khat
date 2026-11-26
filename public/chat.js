@@ -714,7 +714,7 @@ function messageElement(message, streamed = false, index = -1) {
   }
   const heading = node("div", (!temporary && state.aiName) || "Khat", "message-label");
   if (Object.hasOwn(modelNames, message.model)) {
-    heading.append(node("span", modelNames[message.model], "model-label"));
+    heading.append(node("span", modelNames[message.model].replace(/^Khat /, ""), "model-label"));
   }
   element.append(heading);
   if (streamed) {
@@ -847,6 +847,7 @@ function renderLanguage() {
   send.setAttribute("aria-label", labels.send);
   stop.setAttribute("aria-label", labels.stop);
   byId("voice").title = Recognition ? labels.voice : labels.voiceUnsupported;
+  byId("image-prompt").placeholder = labels.imagePlaceholder;
   prompt.placeholder = `${labels.prompt}…`;
   renderFiles();
   renderHistory();
@@ -1401,7 +1402,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
   }
 }
 
-const studio = setupStudio({ state: () => state, labels: () => labels, persist, report, vault: () => vault, onUsage: refreshUsage });
+const studio = setupStudio({ state: () => state, labels: () => labels, persist, report, vault: () => vault, onUsage: refreshUsage, isTemporary: () => Boolean(temporary) });
 setupAdmin(() => labels, refreshUsage);
 mountGlass();
 motionState({});

@@ -26,7 +26,7 @@ export function crop(data, ratio, compact) {
   });
 }
 
-export function setupStudio({ state, labels, persist, report, vault, onUsage }) {
+export function setupStudio({ state, labels, persist, report, vault, onUsage, isTemporary }) {
   const dialog = document.getElementById("studio");
   const form = document.getElementById("image-form");
   const gallery = document.getElementById("gallery");
@@ -58,7 +58,12 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
   function render() {
     preview = null;
     gallery.replaceChildren();
-    for (const item of ephemeral ? (resultOnly ? [resultOnly] : []) : state().images) {
+    const items = ephemeral ? (resultOnly ? [resultOnly] : []) : state().images;
+    document.getElementById("studio-history-title").textContent = labels()[ephemeral ? "studioResult" : "imageHistory"];
+    const empty = document.getElementById("studio-empty");
+    empty.textContent = labels()[ephemeral ? "studioNoResult" : "studioEmpty"];
+    empty.hidden = items.length > 0;
+    for (const item of items) {
       const figure = node("figure");
       const image = node("img");
       image.src = item.data;
@@ -99,7 +104,9 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
         form.elements.prompt.value = item.prompt;
         form.requestSubmit();
       });
-      figure.append(open, caption, download, again, remove);
+      const actions = node("div", undefined, "image-actions");
+      actions.append(download, again, remove);
+      figure.append(open, caption, actions);
       gallery.append(figure);
     }
   }
@@ -124,10 +131,12 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
       render();
       submit.disabled = false;
     } catch {
-      if (request === opening && dialog.open) status.textContent = labels().galleryUnavailable;
+      if (request === opening && dialog.open) {
+        status.textContent = labels().galleryUnavailable;
+      }
     }
   }
-  for (const id of ["studio-open", "composer-image"]) document.getElementById(id).addEventListener("click", () => open());
+  for (const id of ["studio-open", "composer-image"]) document.getElementById(id).addEventListener("click", () => open("", isTemporary()));
   document.getElementById("studio-close").addEventListener("click", () => dialog.close());
   const fullscreen = document.getElementById("image-fullscreen");
   fullscreen.addEventListener("click", () => {
