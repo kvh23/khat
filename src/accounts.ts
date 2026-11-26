@@ -74,34 +74,51 @@ export async function accountRoute(path: string, request: Request, input: Record
 	if (path === "/api/login" || path === "/api/register") {
 		const username = name(input.username);
 		if (!username || !validPassword(input.password)) return fail(400, "accountInvalid");
-		const ip = request.headers.get("CF-Connecting-IP") ?? "local";
-		if (!(await env.AUTH_LIMIT.limit({ key: `account-ip:${ip}` })).success ||
-			!(await env.AUTH_LIMIT.limit({ key: `account-name:${username}` })).success) return fail(429, "limited");
-		if (path === "/api/login") {
-			const user = await db.prepare("SELECT * FROM accounts WHERE username=?").bind(username).first<Credentials>();
-			if (!(await correct(env, input.password, user)) || !user?.active) return fail(401, "accountInvalid");
-			return session(db, user, request);
+		let stage = "rate_limit";
+		try {
+			const ip = request.headers.get("CF-Connecting-IP") ?? "local";
+			if (!(await env.AUTH_LIMIT.limit({ key: `account-ip:${ip}` })).success ||
+				!(await env.AUTH_LIMIT.limit({ key: `account-name:${username}` })).success) return fail(429, "limited");
+			if (path === "/api/login") {
+				stage = "account_lookup";
+				const user = await db.prepare("SELECT * FROM accounts WHERE username=?").bind(username).first<Credentials>();
+				stage = "password_check";
+				if (!(await correct(env, input.password, user)) || !user?.active) return fail(401, "accountInvalid");
+				stage = "session_write";
+				return await session(db, user, request);
+			}
+			if (typeof input.invite !== "string" || !/^[\w-]{43}$/.test(input.invite)) return fail(400, "inviteInvalid");
+			stage = "invite_lookup";
+			const invitation = await digest(input.invite);
+			const available = await db.prepare("SELECT 1 FROM invitations WHERE digest=? AND expires>? AND redeemed_at IS NULL")
+				.bind(invitation, now()).first();
+			if (!available) return fail(400, "inviteInvalid");
+			const id = crypto.randomUUID();
+			const salt = randomToken();
+			stage = "password_hash";
+			const hash = await passwordHash(env, input.password, salt);
+			const time = now();
+			stage = "account_write";
+			const result = await db.batch([
+				db.prepare(`INSERT OR IGNORE INTO accounts(id,username,salt,password_hash,role)
+					SELECT ?,?,?,?,role FROM invitations WHERE digest=? AND expires>? AND redeemed_at IS NULL`)
+					.bind(id, username, salt, hash, invitation, time),
+				db.prepare(`UPDATE invitations SET redeemed_at=? WHERE digest=? AND EXISTS(SELECT 1 FROM accounts WHERE id=?)`)
+					.bind(time, invitation, id),
+				db.prepare("INSERT INTO workspaces(owner) SELECT id FROM accounts WHERE id=?").bind(id),
+			]);
+			if (!result[0].meta.changes) return fail(400, "inviteInvalid");
+			stage = "account_lookup";
+			const user = await db.prepare("SELECT * FROM accounts WHERE id=?").bind(id).first<Account>();
+			if (!user) throw new Error("Account unavailable after insert");
+			stage = "session_write";
+			return await session(db, user, request);
+		} catch {
+			// Use fixed identifiers only. Passwords, invitation codes, SQL errors,
+			// usernames and cookies must never appear in diagnostic output.
+			console.error("Khat account operation failed", { operation: path === "/api/register" ? "register" : "login", stage });
+			return Response.json({ error: "unavailable", stage }, { status: 503 });
 		}
-		if (typeof input.invite !== "string" || !/^[\w-]{43}$/.test(input.invite)) return fail(400, "inviteInvalid");
-		const invitation = await digest(input.invite);
-		const available = await db.prepare("SELECT 1 FROM invitations WHERE digest=? AND expires>? AND redeemed_at IS NULL")
-			.bind(invitation, now()).first();
-		if (!available) return fail(400, "inviteInvalid");
-		const id = crypto.randomUUID();
-		const salt = randomToken();
-		const hash = await passwordHash(env, input.password, salt);
-		const time = now();
-		const result = await db.batch([
-			db.prepare(`INSERT OR IGNORE INTO accounts(id,username,salt,password_hash,role)
-				SELECT ?,?,?,?,role FROM invitations WHERE digest=? AND expires>? AND redeemed_at IS NULL`)
-				.bind(id, username, salt, hash, invitation, time),
-			db.prepare(`UPDATE invitations SET redeemed_at=? WHERE digest=? AND EXISTS(SELECT 1 FROM accounts WHERE id=?)`)
-				.bind(time, invitation, id),
-			db.prepare("INSERT INTO workspaces(owner) SELECT id FROM accounts WHERE id=?").bind(id),
-		]);
-		if (!result[0].meta.changes) return fail(400, "inviteInvalid");
-		const user = await db.prepare("SELECT * FROM accounts WHERE id=?").bind(id).first<Account>();
-		return session(db, user!, request);
 	}
 	if (!account) return fail(401, "signInRequired");
 

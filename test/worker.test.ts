@@ -243,3 +243,28 @@ describe("account memory and temporary chat", () => {
 		expect(requestedMemory("Remember that I prefer concise replies and my address is private")).toBe("");
 	});
 });
+
+it("reports only a fixed registration stage when password derivation fails", async () => {
+	const { accountRoute } = await import("../src/accounts");
+	const f = fixture();
+	const diagnostics = vi.spyOn(console, "error").mockImplementation(() => {});
+	try {
+		const env = {
+			...f.env,
+			DB: { prepare: () => ({ bind: () => ({ first: async () => ({ 1: 1 }) }) }) },
+			PASSWORDS: { idFromName: () => "fixture", get: () => ({
+				fetch: async () => { throw new Error("Sensitive provider error fixture"); },
+			}) },
+		} as unknown as Env;
+		const response = await accountRoute("/api/register", new Request("https://khat.example/api/register"), {
+			username: "private_user", password: "private test passphrase", invite: "I".repeat(43),
+		}, env, null);
+		expect(response.status).toBe(503);
+		expect(await response.json()).toEqual({ error: "unavailable", stage: "password_hash" });
+		expect(diagnostics.mock.calls).toEqual([
+			["Khat account operation failed", { operation: "register", stage: "password_hash" }],
+		]);
+	} finally {
+		diagnostics.mockRestore();
+	}
+});
