@@ -452,3 +452,59 @@ aside.liquid-glass { padding: var(--space-4) var(--space-3); }
 .message-action { min-width: 44px; padding: .55rem; }
 .message-action svg { vertical-align: middle; }
 .welcome h1 { max-inline-size: 17ch; margin-inline: auto; text-wrap: balance; }
+
+.brand {
+  min-height: 44px;
+  align-items: baseline;
+  font: 500 2rem/.98 Georgia, "New York", serif;
+  letter-spacing: -.075em;
+  padding-block: 4px 0;
+}
+.model-label {
+  margin-inline-start: .5rem;
+  padding-inline-start: .5rem;
+  border-inline-start: 1px solid var(--line);
+  font-size: .74rem;
+  font-weight: 500;
+}
+#studio.liquid-glass {
+  width: min(740px, calc(100% - 24px));
+  padding: clamp(16px, 4vw, 32px);
+  box-shadow: var(--glass-elevated);
+  overscroll-behavior: contain;
+}
+#studio .dialog-header { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+#studio-title { letter-spacing: -.045em; }
+#studio-close { background: var(--side); }
+#studio #image-prompt {
+  min-height: 110px;
+  padding: 12px 14px;
+  border-radius: var(--radius-input);
+  background: var(--panel);
+  line-height: 1.5;
+}
+#studio #image-prompt:focus-visible { outline-offset: 2px; }
+#studio .studio-options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+#studio .studio-options label { font-size: .82rem; }
+#studio .studio-options select { font-size: .86rem; }
+.studio-submit { display: flex; justify-content: end; margin-top: 14px; }
+#studio-allowance, #studio-empty { font-size: .84rem; }
+#image-status:empty { display: none; }
+.studio-history-title { margin: 22px 0 10px; padding-top: 15px; border-top: 1px solid var(--line); font-size: .98rem; }
+#gallery { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+#gallery figure { padding: 8px; background: var(--panel); box-shadow: var(--glass-subtle); }
+#gallery figcaption { padding: 10px 5px 4px; line-height: 1.45; }
+.image-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.image-actions a, .image-actions button { font-size: .78rem; }
+.image-actions a { padding: .65rem .45rem; }
+#image-preview.liquid-glass:not(.fullscreen) { padding: 12px; box-shadow: var(--glass-elevated); }
+
+@media (max-width: 540px) {
+  #studio .studio-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #studio .studio-options > :last-child { grid-column: 1 / -1; }
+  .studio-submit .primary { width: 100%; }
+}
+
+:root:not([data-glass-tier="opaque"]) #studio.liquid-glass {
+  background-color: color-mix(in srgb, var(--panel) max(92%, var(--glass-opacity)), transparent);
+}

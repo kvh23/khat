@@ -227,3 +227,16 @@ Object.assign(translations.da, {
   onboardingHelp: "Brug gerne et kaldenavn. Du kan ændre det i Indstillinger.",
   displayNameInvalid: "Skriv et visningsnavn på højst 40 tegn.",
 });
+
+Object.assign(translations.en, {
+  imagePlaceholder: "Describe the subject, setting, and details you want to see.",
+  studioEmpty: "Images you create will appear here.",
+  studioResult: "Result",
+  studioNoResult: "Create an image to see it here.",
+});
+Object.assign(translations.da, {
+  imagePlaceholder: "Beskriv motivet, omgivelserne og de detaljer, du vil have med.",
+  studioEmpty: "Her vises de billeder, du opretter.",
+  studioResult: "Resultat",
+  studioNoResult: "Opret et billede for at se det her.",
+});

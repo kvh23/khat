@@ -115,7 +115,7 @@ const assert = require('node:assert/strict');
     await button('Remove: notes.txt').waitFor();
     await button('Search Wikipedia').click();
     await button('Send').click();
-    await page.locator('.messages').getByText('Khat Think', { exact: true }).waitFor();
+    await page.locator('.messages').getByText('Think', { exact: true }).waitFor();
     const renderedTable = await page.evaluate(async () => {
       const { markdown } = await import("/markdown.js");
       const element = document.createElement("div");

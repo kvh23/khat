@@ -16,7 +16,7 @@
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="shell" hidden>
     <aside id="sidebar" aria-label="Conversation history">
-      <div class="brand"><img src="/khat-mark.svg" width="28" height="28" alt=""><span>Khat</span></div>
+      <div class="brand"><span>Khat</span></div>
       <button type="button" id="new" class="new"><span aria-hidden="true">＋</span><span data-label="newChat">New chat</span></button>
       <button type="button" id="studio-open" class="side-button"><span aria-hidden="true">✧</span> <span data-label="studio">Studio</span></button>
       <div class="history">
@@ -307,27 +307,28 @@
     <header class="dialog-header"><h2 id="studio-title" data-label="studio">Studio</h2><div id="studio-orb" class="orb orb-studio" aria-hidden="true" hidden><i></i><i></i><i></i></div><button type="button" id="studio-close" data-label="close">Close</button></header>
     <form id="image-form">
       <label for="image-prompt" data-label="imagePrompt">Describe an image</label>
-      <textarea id="image-prompt" name="prompt" maxlength="900" required rows="3"></textarea>
+      <textarea id="image-prompt" name="prompt" maxlength="900" required rows="4"></textarea>
       <div class="studio-options">
         <div><label for="ratio" data-label="ratio">Aspect ratio</label>
         <select id="ratio" name="ratio"><option value="square" data-label="square">Square</option><option value="portrait" data-label="portrait">Portrait</option><option value="landscape" data-label="landscape">Landscape</option><option value="wide">16:9</option><option value="tall">9:16</option></select></div>
         <div><label for="image-style" data-label="imageStyle">Image style</label>
         <select id="image-style" name="style"><option value="plain" data-label="plain">None</option><option value="editorial" data-label="editorial">Editorial photo</option><option value="illustration" data-label="illustration">Illustration</option><option value="modern" data-label="modern">Scandinavian graphic</option><option value="photo" data-label="photo">photo</option><option value="cinema" data-label="cinema">cinema</option><option value="minimal" data-label="minimalStyle">minimalStyle</option><option value="architecture" data-label="architecture">architecture</option><option value="product" data-label="product">product</option><option value="digital" data-label="digital">digital</option><option value="abstract" data-label="abstractStyle">abstractStyle</option><option value="concept" data-label="concept">concept</option><option value="mono" data-label="mono">mono</option></select></div>
-      </div>
-      <label for="image-quality" data-label="quality">Quality</label>
+        <div><label for="image-quality" data-label="quality">Quality</label>
       <select id="image-quality" name="quality">
         <option value="draft" data-label="draftQuality">Draft · 2 steps</option>
         <option value="balanced" data-label="balancedQuality" selected>Standard · 4 steps</option>
         <option value="detail" data-label="detailQuality">Detailed · 8 steps</option>
-      </select>
+      </select></div>
+      </div>
       <label class="check"><input type="checkbox" name="enhance" id="enhance-image"> <span data-label="enhanceImage">Enhance composition</span></label>
-      <button id="generate" type="submit" class="primary" data-label="generate">Generate image</button>
+      <div class="studio-submit"><button id="generate" type="submit" class="primary" data-label="generate">Generate image</button></div>
       <div id="studio-skeleton" class="skeleton" aria-hidden="true" hidden></div>
     </form>
     <p id="studio-allowance" hidden></p>
     <p id="image-status" role="status"></p>
-    <h3 data-label="imageHistory">Image history</h3>
-    <div id="gallery"></div>
+    <h3 class="studio-history-title" id="studio-history-title" data-label="imageHistory">Image history</h3>
+    <p id="studio-empty" data-label="studioEmpty" hidden></p>
+    <div id="gallery" aria-labelledby="studio-history-title"></div>
   </dialog>
   <dialog id="voice-room" class="voice-room glass" aria-labelledby="voice-room-title">
     <h2 id="voice-room-title" data-label="voiceRoom">Voice</h2>
