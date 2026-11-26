@@ -1,7 +1,7 @@
-function publicReply(text) {
+function publicReply(text, flush = false) {
   const withoutReasoning = text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "");
   const partialStart = /<(?:t(?:h(?:i(?:n(?:k)?)?)?)?)?$/i;
-  return withoutReasoning.replace(partialStart, "");
+  return flush ? withoutReasoning : withoutReasoning.replace(partialStart, "");
 }
 
 export async function readReply(body, update) {
@@ -23,7 +23,7 @@ export async function readReply(body, update) {
         buffer = buffer.slice(end + 2);
         if (!data) continue;
         if (data === "[DONE]") {
-          const reply = publicReply(text).trimStart();
+          const reply = publicReply(text, true).trimStart();
           if (!reply) throw new Error("modelFailed");
           return reply;
         }

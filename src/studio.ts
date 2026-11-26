@@ -15,11 +15,22 @@ const styles = {
 	editorial: "Editorial photography, soft light, restrained colors",
 	illustration: "Hand-drawn editorial illustration, visible paper texture",
 	modern: "Scandinavian graphic design, modern geometric forms",
+	photo: "photorealistic materials, natural light, credible physical detail",
+	cinema: "cinematic composition, layered depth and directional lighting",
+	minimal: "minimalist composition, generous negative space, restrained palette",
+	architecture: "architectural visualization, precise spatial perspective",
+	product: "industrial product design, studio setup and material detail",
+	digital: "digital artwork with deliberate brushwork and lighting",
+	abstract: "abstract forms, rhythmic contrast and texture",
+	concept: "concept art, expressive composition and atmospheric depth",
+	mono: "black-and-white monochrome, controlled tonal range",
 };
 const ratios = {
 	square: "square composition",
 	portrait: "center the key subjects within a narrow vertical crop",
 	landscape: "center the key subjects within a wide horizontal crop",
+	wide: "compose for a 16:9 crop with the main subject in the middle band",
+	tall: "compose for a 9:16 crop with the main subject in the middle column",
 };
 
 type ClassifierResponse = { response?: string; choices?: { message?: { content?: string } }[] };
@@ -33,26 +44,31 @@ async function permitted(env: Env, content: UserMessage["content"]) {
 	return (output.response ?? output.choices?.[0]?.message?.content)?.trim() === "ALLOW";
 }
 
+export function permittedImage(env: Env, image: string) {
+	return permitted(env, [
+		{ type: "text", text: "Classify only the attached image." },
+		{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${image}` } },
+	]);
+}
+
 export async function generateImage(input: Record<string, unknown>, env: Env, account?: Account | null) {
-	const { prompt, style, ratio } = input;
+	const { prompt, style, ratio, quality = "balanced", enhance = false } = input;
+	const steps = quality === "draft" ? 2 : quality === "detail" ? 8 : quality === "balanced" ? 4 : 0;
 	if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 900 ||
-		typeof style !== "string" || !Object.hasOwn(styles, style) || typeof ratio !== "string" || !Object.hasOwn(ratios, ratio)) {
+		!steps || typeof enhance !== "boolean" || typeof style !== "string" || !Object.hasOwn(styles, style) || typeof ratio !== "string" || !Object.hasOwn(ratios, ratio)) {
 		return { error: "invalid", status: 400 } as const;
 	}
 	if (!await reserve(env, "image", 500, account)) return { error: "dailyLimit", status: 429 } as const;
 	try {
-		const description = [prompt.trim(), styles[style as keyof typeof styles], ratios[ratio as keyof typeof ratios]].filter(Boolean).join(". ");
+		const description = [prompt.trim(), styles[style as keyof typeof styles], ratios[ratio as keyof typeof ratios],
+			enhance ? "Keep the original subjects and scene. Refine composition, light direction, material texture and visual hierarchy." : ""].filter(Boolean).join(". ");
 		if (!await permitted(env, description)) return { error: "imageBlocked", status: 422 } as const;
 
-		const { image } = await env.AI.run(FLUX, { prompt: description, steps: 4 });
+		const { image } = await env.AI.run(FLUX, { prompt: description, steps });
 		if (typeof image !== "string" || image.length > 3_000_000 ||
 			!/^\/9j\/[A-Za-z0-9+/]+={0,2}$/.test(image)) return { error: "imageFailed", status: 502 } as const;
 
-		const url = `data:image/jpeg;base64,${image}`;
-		const outputAllowed = await permitted(env, [
-			{ type: "text", text: "Classify only the attached image." },
-			{ type: "image_url", image_url: { url } },
-		]);
+		const outputAllowed = await permittedImage(env, image);
 		if (!outputAllowed) return { error: "imageBlocked", status: 422 } as const;
 		return { image } as const;
 	} catch {

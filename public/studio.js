@@ -7,7 +7,7 @@ export function crop(data, ratio, compact) {
     const image = new Image();
     image.onload = () => {
       try {
-        const target = { square: 1, portrait: 3 / 4, landscape: 4 / 3 }[ratio] ?? image.naturalWidth / image.naturalHeight;
+        const target = { square: 1, portrait: 3 / 4, landscape: 4 / 3, wide: 16 / 9, tall: 9 / 16 }[ratio] ?? image.naturalWidth / image.naturalHeight;
         const width = Math.floor(Math.min(image.naturalWidth, image.naturalHeight * target));
         const height = Math.floor(width / target);
         const canvas = document.createElement("canvas");
@@ -26,7 +26,7 @@ export function crop(data, ratio, compact) {
   });
 }
 
-export function setupStudio({ state, labels, persist, report, vault }) {
+export function setupStudio({ state, labels, persist, report, vault, onUsage }) {
   const dialog = document.getElementById("studio");
   const form = document.getElementById("image-form");
   const gallery = document.getElementById("gallery");
@@ -36,11 +36,13 @@ export function setupStudio({ state, labels, persist, report, vault }) {
   const orb = document.getElementById("studio-orb");
   let busy = false;
   let preview;
+  let ephemeral = false;
+  let resultOnly;
 
   function render() {
     preview = null;
     gallery.replaceChildren();
-    for (const item of state().images) {
+    for (const item of ephemeral ? (resultOnly ? [resultOnly] : []) : state().images) {
       const figure = node("figure");
       const image = node("img");
       image.src = item.data;
@@ -66,6 +68,7 @@ export function setupStudio({ state, labels, persist, report, vault }) {
       remove.addEventListener("click", async () => {
         remove.disabled = true;
         const session = vault();
+        if (ephemeral) { resultOnly = undefined; render(); return; }
         try { await session?.removeImage?.(item.id); }
         catch (error) { status.textContent = labels()[error.message] ?? labels().unavailable; remove.disabled = false; return; }
         if (vault() !== session) return;
@@ -73,18 +76,39 @@ export function setupStudio({ state, labels, persist, report, vault }) {
         if (!vault()?.account) persist();
         render();
       });
-      figure.append(open, caption, download, remove);
+      const again = node("button", labels().regenerate);
+      again.type = "button";
+      again.addEventListener("click", () => {
+        if (busy) return;
+        form.elements.prompt.value = item.prompt;
+        form.requestSubmit();
+      });
+      figure.append(open, caption, download, again, remove);
       gallery.append(figure);
     }
   }
 
-  document.getElementById("studio-open").addEventListener("click", () => {
-    status.textContent = "";
+  function open(prompt = "", temporary = false) {
+    if (dialog.open) return;
+    ephemeral = temporary;
+    resultOnly = undefined;
+    status.textContent = prompt ? labels().studioRouted : "";
+    form.elements.prompt.value = prompt.slice(0, 900);
     render();
     dialog.showModal();
-  });
+  }
+  for (const id of ["studio-open", "composer-image"]) document.getElementById(id).addEventListener("click", () => open());
   document.getElementById("studio-close").addEventListener("click", () => dialog.close());
-  document.getElementById("image-preview").addEventListener("close", () => {
+  const fullscreen = document.getElementById("image-fullscreen");
+  fullscreen.addEventListener("click", () => {
+    const expanded = document.getElementById("image-preview").classList.toggle("fullscreen");
+    fullscreen.setAttribute("aria-pressed", String(expanded));
+    fullscreen.textContent = labels()[expanded ? "compactVoice" : "fullscreen"];
+  });
+  document.getElementById("image-preview").addEventListener("close", event => {
+    event.currentTarget.classList.remove("fullscreen");
+    fullscreen.setAttribute("aria-pressed", "false");
+    fullscreen.textContent = labels().fullscreen;
     document.getElementById("full-image").removeAttribute("src");
     preview = null;
   });
@@ -95,12 +119,16 @@ export function setupStudio({ state, labels, persist, report, vault }) {
     preview?.close();
     gallery.replaceChildren();
     form.reset();
+    resultOnly = undefined;
+    ephemeral = false;
   });
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(form));
+    if (data.enhance) data.enhance = true;
+    if (data.quality === "balanced") delete data.quality;
     if (busy || !data.prompt.trim()) return;
-    if (state().images.length >= 12) {
+    if (!ephemeral && state().images.length >= 12) {
       status.textContent = labels().galleryFull;
       return;
     }
@@ -119,13 +147,16 @@ export function setupStudio({ state, labels, persist, report, vault }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-      const image = await crop(result.image, data.ratio, Boolean(session?.account));
+      const image = await crop(result.image, data.ratio, Boolean(session?.account) && !ephemeral);
       const item = { id: crypto.randomUUID(), prompt: data.prompt.trim(), data: image };
       if (vault() !== session) return;
-      await session?.saveImage?.(item);
-      if (vault() !== session) return;
-      state().images.unshift(item);
-      if (!vault()?.account) await persist();
+      if (ephemeral) resultOnly = item;
+      else {
+        await session?.saveImage?.(item);
+        if (vault() !== session) return;
+        state().images.unshift(item);
+        if (!vault()?.account) await persist();
+      }
       status.textContent = labels().imageReady;
       render();
       if (gallery.firstElementChild) animate(gallery.firstElementChild, [{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1 }], 300);
@@ -140,6 +171,8 @@ export function setupStudio({ state, labels, persist, report, vault }) {
       motionState({ image: false });
       close.disabled = false;
       submit.disabled = false;
+      onUsage();
     }
   });
+  return { open };
 }

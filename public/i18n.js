@@ -154,3 +154,34 @@ Object.assign(translations.da, {
   motion: "Bevægelse", enableMotion: "Aktivér animationer", orbStyle: "Kuglestil", orbOne: "Første kuglefarve",
   orbTwo: "Anden kuglefarve", motionIntensity: "Animationsintensitet",
 });
+
+Object.assign(translations.en, {
+  fullscreen: "Full screen", visionAttached: "Image attached. Image questions use Khat Pro.", studioTool: "Create image", studioRouted: "Prompt sent to Studio. Review the settings and generate when ready.",
+  photo: "Photorealistic", cinema: "Cinematic", minimalStyle: "Minimalist", architecture: "Architectural",
+  product: "Product design", digital: "Digital art", abstractStyle: "Abstract", concept: "Concept art", mono: "Black and white",
+  quality: "Quality", draftQuality: "Draft · 2 steps", balancedQuality: "Standard · 4 steps", detailQuality: "Detailed · 8 steps",
+  enhanceImage: "Enhance composition", dailyUsage: "Today (UTC)", estimatedUsage: "Shared estimated Neurons", nearLimit: "Approaching a limit",
+  voiceRoom: "Voice", voiceIdle: "Start listening when you’re ready.", voiceStarting: "Starting microphone…", speaking: "Reading aloud…",
+  listen: "Listen", mute: "Mute microphone", expandVoice: "Expand", compactVoice: "Compact",
+  surfaceSettings: "Glass and atmosphere", glassOpacity: "Glass opacity", glassBlur: "Glass blur", orbGlow: "Orb glow",
+  orbSpeed: "Orb speed", orbDetail: "Orb detail", orbSize: "Orb size", textSize: "Chat text size", density: "Density",
+  comfortable: "Comfortable", compact: "Compact", rail: "Sidebar material", glass: "Glass", solid: "Solid",
+  ambience: "Atmospheric background", resetVisual: "Reset visual settings",
+  professional: "Professional", creative: "Creative", mentor: "Critical mentor", technical: "Technical",
+  concise: "Concise", educational: "Educational", friendly: "Friendly",
+});
+Object.assign(translations.da, {
+  fullscreen: "Fuld skærm", visionAttached: "Billede vedhæftet. Billedspørgsmål bruger Khat Pro.", studioTool: "Lav billede", studioRouted: "Din beskrivelse er sendt til Studiet. Se indstillingerne, og generér, når du er klar.",
+  photo: "Fotorealistisk", cinema: "Filmisk", minimalStyle: "Minimalistisk", architecture: "Arkitektonisk",
+  product: "Produktdesign", digital: "Digital kunst", abstractStyle: "Abstrakt", concept: "Konceptkunst", mono: "Sort-hvid",
+  quality: "Kvalitet", draftQuality: "Skitse · 2 trin", balancedQuality: "Standard · 4 trin", detailQuality: "Detaljeret · 8 trin",
+  enhanceImage: "Forbedr komposition", dailyUsage: "I dag (UTC)", estimatedUsage: "Fælles estimerede neuroner", nearLimit: "En grænse nærmer sig",
+  voiceRoom: "Stemme", voiceIdle: "Start mikrofonen, når du er klar.", voiceStarting: "Starter mikrofonen…", speaking: "Læser op…",
+  listen: "Lyt", mute: "Slå mikrofon fra", expandVoice: "Udvid", compactVoice: "Kompakt",
+  surfaceSettings: "Glas og baggrund", glassOpacity: "Glassets opacitet", glassBlur: "Glassets sløring", orbGlow: "Kuglens glød",
+  orbSpeed: "Kuglens hastighed", orbDetail: "Kuglens detaljer", orbSize: "Kuglens størrelse", textSize: "Chattekststørrelse", density: "Tæthed",
+  comfortable: "Luftig", compact: "Kompakt", rail: "Sidepanelets materiale", glass: "Glas", solid: "Mat",
+  ambience: "Atmosfærisk baggrund", resetVisual: "Nulstil udseende",
+  professional: "Professionel", creative: "Kreativ", mentor: "Kritisk mentor", technical: "Teknisk",
+  concise: "Kortfattet", educational: "Pædagogisk", friendly: "Venlig",
+});

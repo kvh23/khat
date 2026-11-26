@@ -137,11 +137,11 @@ describe("chat and sources", () => {
 
 describe("model routing and quota", () => {
 	it.each([
-		["instant", "Tell me about Copenhagen", "@cf/meta/llama-3.1-8b-instruct-fp8", "instant"],
-		["think", "Tell me about Copenhagen", "@cf/qwen/qwen3-30b-a3b-fp8", "think"],
+		["instant", "Tell me about Copenhagen", "@cf/ibm-granite/granite-4.0-h-micro", "instant"],
+		["think", "Tell me about Copenhagen", "@cf/zai-org/glm-4.7-flash", "think"],
 		["pro", "Tell me about Copenhagen", "@cf/google/gemma-4-26b-a4b-it", "pro"],
-		["auto", "Explain Copenhagen", "@cf/meta/llama-3.1-8b-instruct-fp8", "instant"],
-		["auto", "Compare two ways to solve this", "@cf/qwen/qwen3-30b-a3b-fp8", "think"],
+		["auto", "Explain Copenhagen", "@cf/ibm-granite/granite-4.0-h-micro", "instant"],
+		["auto", "Compare two ways to solve this", "@cf/zai-org/glm-4.7-flash", "think"],
 		["auto", "x".repeat(3500), "@cf/google/gemma-4-26b-a4b-it", "pro"],
 	])("routes %s to a real model", async (mode, content, id, served) => {
 		const { post, run } = fixture();
@@ -267,4 +267,41 @@ it("reports only a fixed registration stage when password derivation fails", asy
 	} finally {
 		diagnostics.mockRestore();
 	}
+});
+
+it("falls back to a cheaper model when Auto cannot reserve its first candidate", async () => {
+	const { post, run, quota } = fixture();
+	quota.mockResolvedValueOnce(new Response(null, { status: 429 }));
+	const response = await post({ mode: "auto", messages: [{ ...prompt, content: "Document ".repeat(410) }] });
+	expect(response.headers.get("x-khat-model")).toBe("think");
+	expect(response.headers.get("x-khat-fallback")).toBe("true");
+	expect(run).toHaveBeenCalledTimes(1);
+	expect(quota.mock.calls.map(([, init]) => JSON.parse(String(init.body)).kind)).toEqual(["text", "text"]);
+});
+
+it("applies real FLUX quality steps without bypassing either safety check", async () => {
+	const f = fixture();
+	f.run.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ image: "/9j/eA==" })
+		.mockResolvedValueOnce({ response: "ALLOW" });
+	const response = await f.post({ prompt: "A small mountain cabin", style: "architecture", ratio: "wide", quality: "detail", enhance: true }, {}, "/api/image");
+	expect(response.status).toBe(200);
+	expect(f.run).toHaveBeenCalledTimes(3);
+	expect(f.run.mock.calls[1][1]).toMatchObject({ steps: 8, prompt: expect.stringContaining("16:9") });
+	expect(f.run.mock.calls[1][1]).toMatchObject({ prompt: expect.stringContaining("visual hierarchy") });
+});
+
+it("checks an attached image before routing vision to Gemma 4", async () => {
+	const f = fixture();
+	// Minimal JPEG marker fixture with a 1×1 baseline frame.
+	const jpeg = Buffer.from([255, 216, 255, 192, 0, 11, 8, 0, 1, 0, 1, 1, 1, 17, 0, 255, 217]).toString("base64");
+	f.run.mockResolvedValueOnce({ response: "ALLOW" });
+	const response = await f.post({ mode: "instant", messages: [prompt], vision: jpeg });
+	expect(response.headers.get("x-khat-model")).toBe("pro");
+	expect(f.run).toHaveBeenCalledTimes(2);
+	expect(f.run.mock.calls[1][0]).toBe("@cf/google/gemma-4-26b-a4b-it");
+	expect(JSON.stringify(f.run.mock.calls[1][1])).toContain("data:image/jpeg;base64,");
+	const blocked = fixture();
+	blocked.run.mockResolvedValueOnce({ response: "BLOCK" });
+	expect((await blocked.post({ messages: [prompt], vision: jpeg })).status).toBe(422);
+	expect(blocked.run).toHaveBeenCalledTimes(1);
 });

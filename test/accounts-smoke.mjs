@@ -108,6 +108,12 @@ try {
   await call("/api/chat", { actor: member, data: message, status: 429 });
   const overview = (await call("/api/admin", { actor: admin })).body;
   assert.equal(overview.usage.users[member.account.id].text, 1);
+  const memberUsage = (await call("/api/usage", { actor: member })).body;
+  assert.match(memberUsage.day, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(memberUsage.text, 1);
+  assert.equal(memberUsage.textLimit, 1);
+  assert.equal(memberUsage.users, undefined);
+  await call("/api/usage", { actor: member, headers: { "X-Khat-Account": admin.account.id }, status: 409 });
   assert.doesNotMatch(JSON.stringify(overview), /Private notebook|Sensitive example|Trees/);
   await call("/api/logout", { actor: member, data: {}, status: 204 });
   await call("/api/workspace", { actor: member, status: 401 });
@@ -129,10 +135,22 @@ try {
     const page = await context.newPage();
     await page.addInitScript(() => {
       window.SpeechRecognition = class {
-        start() { this.timer = setTimeout(() => this.stop(), 1600); }
+        start() {
+          this.onstart?.();
+          this.timer = setTimeout(() => {
+            if (window.voiceFixture) this.onresult({ resultIndex: 0, results: [[{ transcript: "Talk about the stars" }]] });
+            this.stop();
+          }, window.voiceFixture ? 160 : 1600);
+        }
         stop() { clearTimeout(this.timer); this.onend(); }
         abort() { this.stop(); }
       };
+      if (window.speechSynthesis) {
+        speechSynthesis.speak = utterance => {
+          window.spokenFixture = utterance.text;
+          utterance.onstart?.();
+        };
+      }
       navigator.mediaDevices.getUserMedia = async () => {
         const context = new AudioContext();
         const signal = context.createOscillator();
@@ -229,6 +247,16 @@ try {
     await page.waitForFunction(() => parseFloat(document.documentElement.style.getPropertyValue("--voice-level")) > .05);
     await page.waitForFunction(() => document.documentElement.dataset.orbState === "idle");
     assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue("--voice-level")), "0");
+
+    await page.evaluate(() => { window.voiceFixture = true; });
+    await button("Voice").click();
+    await button("Listen").click();
+    await page.waitForFunction(() => document.documentElement.dataset.orbState === "speaking");
+    assert.equal(await page.evaluate(() => window.spokenFixture), "Hello");
+    assert.equal(expected.at(-1).messages.at(-1).content, "Talk about the stars");
+    await page.locator("#voice-room").getByRole("button", { name: "Stop", exact: true }).click();
+    await page.locator("#voice-room").getByRole("button", { name: "Close", exact: true }).click();
+    await page.waitForFunction(() => document.documentElement.dataset.orbState === "idle");
 
     const frameP95 = await page.evaluate(() => new Promise(resolve => {
       const times = [];

@@ -1,6 +1,8 @@
-# Khat 2.0
+# Khat — Liquid Intelligence 3.0
 
 Khat is a bilingual AI workspace for chat and image generation. It uses the existing Cloudflare Worker and Workers AI binding. The interface follows the system theme by default and supports a custom accent, reduced motion, and English or Danish.
+
+[3.0 implementation notes, model evaluation, screenshots, and motion demo](docs/liquid-intelligence.md)
 
 ## Review and test
 
@@ -95,15 +97,15 @@ Catalog and rates checked on 26 November 2026. Workers AI on the Workers Free pl
 
 | Mode | Model | Neurons per million input / output tokens |
 | --- | --- | --- |
-| Khat Instant | [Llama 3.1 8B Instruct FP8](https://developers.cloudflare.com/workers-ai/models/llama-3.1-8b-instruct-fp8/) | 13,778 / 26,128 |
-| Khat Think | [Qwen3 30B A3B FP8](https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/) | 4,625 / 30,475 |
+| Khat Instant | [Granite 4.0 H Micro](https://developers.cloudflare.com/workers-ai/models/granite-4.0-h-micro/) | 1,542 / 10,158 |
+| Khat Think | [GLM-4.7-Flash](https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/) | 5,500 / 36,400 |
 | Khat Pro | [Gemma 4 26B A4B IT](https://developers.cloudflare.com/workers-ai/models/gemma-4-26b-a4b-it/) | 9,091 / 27,273 |
 | Existing model and fallback | [Llama 3.3 70B Instruct FP8 Fast](https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/) | 26,668 / 204,805 |
 | Evaluated, excluded | [NVIDIA Nemotron 3 Super 120B A12B](https://developers.cloudflare.com/workers-ai/models/nemotron-3-120b-a12b/) | 45,455 / 136,364. Cloudflare marks it deprecated as of 20 November 2026. |
 
 Automatic selection uses prompt and context length and Danish/English reasoning cues. These rules are heuristic. The model shown on a completed reply is the model that started its stream. If the selected provider call fails before streaming, Khat can try a fallback within the remaining budget. A stream that fails in progress can be retried by the user. Thinking traces are omitted from the rendered answer. The candidate models were evaluated against the official catalog, API contracts, capabilities and rates. Live quality, latency, and account-specific access have not been benchmarked.
 
-Studio calls [FLUX.1 Schnell](https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/) at four steps. Cloudflare lists 4.8 Neurons per 512×512 tile and 9.6 per step. The documented API does not accept output dimensions. Portrait and landscape add composition guidance and use a local center crop for the preview, history, and downloaded JPEG.
+Studio calls [FLUX.1 Schnell](https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/) at two, four, or eight steps. Cloudflare lists 4.8 Neurons per 512×512 tile and 9.6 per step. The documented API does not accept output dimensions. Portrait and landscape add composition guidance and use a local center crop for the preview, history, and downloaded JPEG.
 
 ## Security and usage
 
@@ -122,4 +124,4 @@ Studio calls [FLUX.1 Schnell](https://developers.cloudflare.com/workers-ai/model
 - Memory is off by default. Inspect, edit, or clear it in Settings, then save. It is user-managed and has no automatic extraction. The assistant name, style, length, and instructions are preferences within the server safety rules.
 - Search is Wikipedia only. The selected language’s Wikipedia receives up to 280 characters of the latest prompt when search is on. Attachments support up to three UTF-8 text, data, or source files of 12,000 characters each. Previous attachments retain filenames only.
 - Studio stores up to 12 images per account or encrypted local profile. Download anything you want to keep outside the browser before clearing site data.
-- The legacy vault requires a modern browser with IndexedDB, Web Crypto, and Web Locks. Speech availability depends on the browser, its platform service and device permissions. Markdown covers common headings, lists, quotes, emphasis, links, and fenced code with copy. Native Safari and physical Apple devices, Cloudflare account-level model access, and real image safety responses remain to be checked in a review environment.
+- The legacy vault requires a modern browser with IndexedDB, Web Crypto, and Web Locks. Speech availability depends on the browser, its platform service and device permissions. Markdown covers common headings, lists, quotes, emphasis, links, simple pipe tables, and fenced code with lightweight highlighting and copy. Native Safari and physical Apple devices, Cloudflare account-level model access, and real image safety responses remain to be checked in a review environment.

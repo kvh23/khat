@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
     });
     await context.addInitScript(() => {
       window.SpeechRecognition = class {
-        start() { setTimeout(() => {
+        start() { this.onstart?.(); setTimeout(() => {
           this.onresult({ resultIndex: 0, results: [[{ transcript: 'Hej' }]] });
           this.onend();
         }, 20); }
@@ -115,6 +115,16 @@ const assert = require('node:assert/strict');
     await button('Search Wikipedia').click();
     await button('Send').click();
     await page.locator('.messages').getByText('Khat Think', { exact: true }).waitFor();
+    const renderedTable = await page.evaluate(async () => {
+      const { markdown } = await import("/markdown.js");
+      const element = document.createElement("div");
+      element.append(markdown("| Size | Unit |\n| --- | --- |\n| 42 | mm |\n\nSource [1] <img src=x>\n\n```js\nconst size = 42;\n```",
+        { copy: "Copy", code: "Code" }, () => {}, [{ url: "https://example.test", title: "Source" }]));
+      return { headers: [...element.querySelectorAll("th")].map(item => item.textContent),
+        links: element.querySelectorAll("a.citation").length, unsafe: element.querySelectorAll("img").length,
+        keyword: element.querySelector(".code-keyword")?.textContent };
+    });
+    assert.deepEqual(renderedTable, { headers: ["Size", "Unit"], links: 1, unsafe: 0, keyword: "const" });
     assert.equal(posts[0].memory, '');
     assert.equal(posts[0].mode, 'think');
     assert.equal(posts[0].aiName, 'Aster');
