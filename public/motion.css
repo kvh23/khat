@@ -83,12 +83,26 @@ dialog[open] { animation: dialog-in var(--motion-duration) cubic-bezier(.2,.75,.
 #memory-entries textarea { margin-top: .4rem; }
 #invitation-field[hidden] { display: none; }
 @media (min-width: 761px) {
-  .shell, .shell.collapsed { grid-template-columns: var(--sidebar-width, 254px) minmax(0, 1fr); }
-  .shell.collapsed { --sidebar-width: 0px; }
-  .shell.collapsed aside { display: none; }
+  .shell { grid-template-columns: 254px minmax(0, 1fr); }
+  .shell.collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+  .shell > main { grid-column: 2; grid-row: 1; }
+  .shell > aside {
+    grid-column: 1;
+    grid-row: 1;
+    width: 254px;
+    opacity: 1;
+    transition: transform 170ms ease, opacity 150ms ease, visibility 170ms step-start;
+  }
+  .shell.collapsed > aside {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-100%);
+    transition-timing-function: ease, ease, step-end;
+  }
 }
 @media (max-width: 760px) {
-  .shell, .shell:has(aside.open) { position: relative; grid-template-rows: minmax(0, 1fr); }
+  .shell { position: relative; grid-template-rows: minmax(0, 1fr); }
   .shell aside, .shell.collapsed aside {
     display: flex;
     position: absolute;

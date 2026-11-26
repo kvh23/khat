@@ -107,7 +107,8 @@ const assert = require('node:assert/strict');
     await page.waitForFunction(() => document.documentElement.dataset.effectiveTheme === "dark");
     assert.equal(await page.locator('html').getAttribute('data-effective-theme'), 'dark');
     assert.equal(await page.locator('html').getAttribute('data-accent'), 'blue');
-    await page.getByLabel('Model', { exact: true }).selectOption('think');
+    await page.locator('#mode').click();
+    await page.getByRole('radio', { name: /Khat Think/ }).click();
     await button('Dictate').click();
     await page.waitForFunction(() => document.querySelector('#prompt').value === 'Hej');
     await page.locator('#upload').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Text file') });
@@ -252,7 +253,7 @@ const assert = require('node:assert/strict');
       await page.waitForFunction(scheme => document.documentElement.dataset.effectiveTheme === scheme, colorScheme);
       assert.equal(await page.locator('html').getAttribute('data-effective-theme'), colorScheme);
     }
-    await button('Menu').click();
+    await button('Vis sidepanelet').click();
     await button('Ny chat').waitFor();
 
     assert.deepEqual(failures, []);

@@ -196,3 +196,17 @@ Object.assign(translations.da, {
   studioStorageLimit: "Op til 12 gemte billeder",
   galleryUnavailable: "Studiehistorikken kunne ikke indlæses. Luk Studiet, og åbn det igen for at prøve igen.",
 });
+
+
+Object.assign(translations.en, {
+  modeAuto: "Chooses a mode for your request",
+  modeInstant: "Quick replies for everyday questions",
+  modeThink: "More reasoning for detailed tasks",
+  modePro: "For complex writing and analysis",
+});
+Object.assign(translations.da, {
+  modeAuto: "Vælger en tilstand til din forespørgsel",
+  modeInstant: "Hurtige svar på hverdagsspørgsmål",
+  modeThink: "Mere ræsonnering til detaljerede opgaver",
+  modePro: "Til kompleks skrivning og analyse",
+});

@@ -55,9 +55,9 @@
           <h1 data-label="welcome">What’s on your mind?</h1>
           <p id="welcome-intro" data-label="intro">A space to think, write, and figure things out.</p>
           <div class="suggestions">
-            <button type="button" data-prompt="explain"><span aria-hidden="true">✧</span><span data-label="explain">Explain a concept</span></button>
-            <button type="button" data-prompt="write"><span aria-hidden="true">✎</span><span data-label="write">Help me write</span></button>
-            <button type="button" data-prompt="brainstorm"><span aria-hidden="true">↗</span><span data-label="brainstorm">Brainstorm ideas</span></button>
+            <button type="button" data-prompt="explain"><span data-label="explain">Explain a concept</span></button>
+            <button type="button" data-prompt="write"><span data-label="write">Help me write</span></button>
+            <button type="button" data-prompt="brainstorm"><span data-label="brainstorm">Brainstorm ideas</span></button>
           </div>
         </section>
         <div id="messages" class="messages" aria-live="polite"></div>
@@ -68,13 +68,19 @@
           <label for="prompt" class="sr-only" data-label="prompt">Message Khat</label>
           <textarea id="prompt" rows="2" maxlength="8000" placeholder="Message Khat…"></textarea>
           <div class="toolbar">
-            <label class="sr-only" for="mode" data-label="model">Model</label>
-            <select id="mode">
-              <option value="auto" data-label="auto">Automatic</option>
-              <option value="instant">Khat Instant</option>
-              <option value="think">Khat Think</option>
-              <option value="pro">Khat Pro</option>
-            </select>
+            <div class="model-picker">
+              <button type="button" id="mode" aria-expanded="false" aria-controls="model-options">
+                <span id="mode-value">Automatic</span>
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <fieldset id="model-options" hidden>
+                <legend class="sr-only" data-label="model">Model</legend>
+                <label><input type="radio" name="composer-mode" value="auto"><span><strong data-label="auto">Automatic</strong><small data-label="modeAuto"></small></span></label>
+                <label><input type="radio" name="composer-mode" value="instant"><span><strong>Khat Instant</strong><small data-label="modeInstant"></small></span></label>
+                <label><input type="radio" name="composer-mode" value="think"><span><strong>Khat Think</strong><small data-label="modeThink"></small></span></label>
+                <label><input type="radio" name="composer-mode" value="pro"><span><strong>Khat Pro</strong><small data-label="modePro"></small></span></label>
+              </fieldset>
+            </div>
             <input id="upload" type="file" multiple accept=".txt,.md,.csv,.json,.log,.js,.ts,.py,.html,.css,.yaml,.yml,.xml,.jpg,.jpeg,.png,.webp" hidden>
             <button type="button" id="attach"><span aria-hidden="true">＋</span> <span data-label="attach">Attach</span></button>
             <button type="button" id="search" aria-pressed="false"><span aria-hidden="true">⌕</span> <span data-label="search">Search Wikipedia</span></button>
@@ -92,7 +98,11 @@
   </div>
   <dialog id="preferences" aria-labelledby="preferences-title">
     <form method="dialog">
-      <h2 id="preferences-title" data-label="settings">Settings</h2>
+      <header class="preferences-header">
+        <h2 id="preferences-title" data-label="settings">Settings</h2>
+        <button type="submit" value="cancel" id="preferences-close" class="icon-button" aria-label="Close" title="Close">×</button>
+      </header>
+      <div class="preferences-content">
       <p data-label="privacy">History and settings stay in this browser. Relevant chat text, memory, and attached text go to Workers AI when you send a message.</p>
       <fieldset id="account-preferences" hidden>
         <legend data-label="profile">Profile</legend>
@@ -162,7 +172,8 @@
       <button id="clear-memory" type="button" data-label="clearMemory">Clear memory</button>
       </div>
       </fieldset>
-      <div class="dialog-actions">
+      </div>
+      <div class="preferences-actions">
         <button type="submit" value="cancel" data-label="cancel">Cancel</button>
         <button type="submit" class="primary" value="save" data-label="save">Save</button>
       </div>
