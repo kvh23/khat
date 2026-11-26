@@ -29,8 +29,8 @@ const visualDefaults = {
   glassOpacity: 77, glassBlur: 17, orbGlow: 62, orbSpeed: 80, orbDetail: 75, orbSize: 100,
   textSize: 16, density: "comfortable", rail: "glass",
 };
-const ranges = { glassOpacity: "glass-opacity", glassBlur: "glass-blur", orbGlow: "orb-glow",
-  orbSpeed: "orb-speed", orbDetail: "orb-detail", orbSize: "orb-size", textSize: "text-size", motionIntensity: "motion-intensity" };
+const ranges = { glassOpacity: "glass-opacity", glassBlur: "glass-blur",
+  textSize: "text-size", motionIntensity: "motion-intensity" };
 const defaults = () => ({
   ...visualDefaults,
   language: deviceLanguage,
@@ -47,14 +47,14 @@ const conversationOptions = byId("conversation-options");
 const editDialog = byId("edit-dialog");
 const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
 const settingIds = {
-  theme: "theme", accent: "accent", customAccent: "custom-accent", aiName: "ai-name", length: "response-length",
-  style: "response-style", personality: "personality", instructions: "instructions", memory: "memory",
-  displayName: "display-name", orbStyle: "orb-style", orbOne: "orb-one", orbTwo: "orb-two", density: "density", rail: "rail",
+  theme: "theme", accent: "accent", customAccent: "custom-accent", length: "response-length",
+  style: "response-style", instructions: "instructions", memory: "memory",
+  displayName: "display-name", orbStyle: "orb-style", orbOne: "orb-one", orbTwo: "orb-two", rail: "rail",
 };
 const appearanceControls = new Map(Object.keys(visualDefaults).map(key => {
   const control = byId(settingIds[key] ?? ranges[key] ?? (key === "motionEnabled" ? "motion-enabled" : key));
   return [control, key];
-}));
+}).filter(([control]) => control));
 const settingsOrb = preferences.querySelector(".personal-preview");
 const previewObserver = new IntersectionObserver(([entry]) => {
   settingsOrb.toggleAttribute("data-visible", preferences.open && entry.isIntersecting);
@@ -165,7 +165,7 @@ function applyVisual(visual) {
     root.style.setProperty("--custom-accent", hex);
     root.style.setProperty("--on-custom", luminance > 0.179 ? "#000" : "#fff");
   }
-  appliedVisual = Object.fromEntries(Array.from(appearanceControls.values(), key => [key, visual[key]]));
+  appliedVisual = Object.fromEntries(Object.keys(visualDefaults).map(key => [key, visual[key]]));
 }
 
 function labelIcon(id, label) {
@@ -220,7 +220,7 @@ function enterProfile(session) {
   byId("account-preferences").hidden = byId("account-memories").hidden = !session.account;
   preferences.querySelector('[data-section="account-preferences"]').hidden = !session.account;
   byId("local-memory").hidden = Boolean(session.account);
-  byId("display-name").required = Boolean(session.account);
+
   byId("temporary").hidden = !session.account;
   byId("temporary").setAttribute("aria-pressed", "false");
   byId("admin-open").hidden = session.account?.role !== "admin";
@@ -712,7 +712,7 @@ function messageElement(message, streamed = false, index = -1) {
     element.append(actions);
     return element;
   }
-  const heading = node("div", (!temporary && state.aiName) || "Khat", "message-label");
+  const heading = node("div", "Khat", "message-label");
   if (Object.hasOwn(modelNames, message.model)) {
     heading.append(node("span", modelNames[message.model].replace(/^Khat /, ""), "model-label"));
   }
@@ -762,7 +762,6 @@ function scrollToLatest() {
 let rendered = [];
 let renderOwner;
 let renderLanguageId;
-let renderName;
 let atBottom = true;
 
 timeline.addEventListener("scroll", () => {
@@ -775,7 +774,7 @@ function renderMessages(follow = true) {
   byId("welcome").hidden = Boolean(turns.length);
   document.documentElement.toggleAttribute("data-conversation", Boolean(turns.length));
   let prefix = 0;
-  if (renderOwner === chat && renderLanguageId === state.language && renderName === state.aiName) {
+  if (renderOwner === chat && renderLanguageId === state.language) {
     while (prefix < turns.length && turns[prefix] === rendered[prefix]) prefix++;
   }
   if (messages.children.length > prefix) {
@@ -794,7 +793,6 @@ function renderMessages(follow = true) {
   for (const button of messages.querySelectorAll(".message-actions button")) button.disabled = Boolean(pending);
   renderOwner = chat;
   renderLanguageId = state.language;
-  renderName = state.aiName;
   rendered = turns.slice();
   if (follow) {
     atBottom = true;
@@ -848,6 +846,7 @@ function renderLanguage() {
   stop.setAttribute("aria-label", labels.stop);
   byId("voice").title = Recognition ? labels.voice : labels.voiceUnsupported;
   byId("image-prompt").placeholder = labels.imagePlaceholder;
+  byId("instructions").placeholder = labels.instructionExample;
   prompt.placeholder = `${labels.prompt}…`;
   renderFiles();
   renderHistory();
@@ -987,12 +986,17 @@ byId("add-memory").addEventListener("click", () => {
 });
 byId("settings").addEventListener("click", () => {
   for (const [key, id] of Object.entries(settingIds)) byId(id).value = state[key];
+  byId("instructions").value = [state.instructions, state.personality].filter(Boolean).join("\n\n");
+  byId("settings-status").hidden = true;
+  selectSettingsTab(settingsTabs.find(tab => !tab.hidden));
   byId("memory-enabled").checked = state.memoryEnabled;
   byId("motion-enabled").checked = state.motionEnabled;
   for (const [key, id] of Object.entries(ranges)) byId(id).value = state[key];
   byId("ambience").checked = state.ambience;
+  refreshSettingsControls();
   avatarDraft = state.avatar;
   byId("avatar-file").value = "";
+  refreshAvatarDraft();
   memoryDraft = state.memories.map(entry => ({ ...entry }));
   renderMemoryDraft();
   byId("custom-color").hidden = state.accent !== "custom";
@@ -1002,18 +1006,33 @@ byId("settings").addEventListener("click", () => {
   preferences.querySelector(".preferences-content").scrollTop = 0;
   previewObserver.observe(settingsOrb);
 });
+function refreshAvatarDraft() {
+  const file = byId("avatar-file").files[0];
+  byId("avatar-filename").textContent = file?.name ?? "";
+  byId("remove-avatar").hidden = !avatarDraft && !file;
+}
+byId("choose-avatar").addEventListener("click", () => byId("avatar-file").click());
+byId("avatar-file").addEventListener("change", refreshAvatarDraft);
 byId("remove-avatar").addEventListener("click", () => {
   avatarDraft = "";
   byId("avatar-file").value = "";
+  refreshAvatarDraft();
 });
 byId("accent").addEventListener("change", event => {
   byId("custom-color").hidden = event.currentTarget.value !== "custom";
 });
-byId("clear-memory").addEventListener("click", () => { byId("memory").value = ""; });
+for (const id of ["clear-memory", "clear-all-memories"]) {
+  byId(id).addEventListener("click", () => {
+    if (!window.confirm(labels.confirmClearMemory)) return;
+    byId("memory").value = "";
+    memoryDraft = [];
+    renderMemoryDraft();
+  });
+}
 function previewVisual() {
-  return Object.fromEntries(Array.from(appearanceControls, ([control, key]) => [
+  return { ...state, ...Object.fromEntries(Array.from(appearanceControls, ([control, key]) => [
     key, control.type === "checkbox" ? control.checked : control.type === "range" ? control.valueAsNumber : control.value,
-  ]));
+  ])) };
 }
 
 function queueVisualPreview() {
@@ -1024,13 +1043,46 @@ function queueVisualPreview() {
   });
 }
 
-preferences.querySelector("[data-settings-nav]").addEventListener("click", event => {
-  const button = event.target.closest("[data-section]");
-  if (!button) return;
-  byId(button.dataset.section).scrollIntoView({ block: "start" });
+const settingsNav = preferences.querySelector("[data-settings-nav]");
+const settingsTabs = [...settingsNav.querySelectorAll("[role=tab]")];
+const settingsButtons = [...preferences.querySelectorAll("button[type=submit]")];
+function selectSettingsTab(selected) {
+  for (const tab of settingsTabs) {
+    const active = tab === selected;
+    tab.tabIndex = active ? 0 : -1;
+    tab.setAttribute("aria-selected", String(active));
+    byId(tab.dataset.section).hidden = !active;
+  }
+  preferences.querySelector(".preferences-content").scrollTop = 0;
+}
+settingsNav.addEventListener("click", event => {
+  const tab = event.target.closest("[role=tab]");
+  if (tab) selectSettingsTab(tab);
 });
+settingsNav.addEventListener("keydown", event => {
+  const tabs = settingsTabs.filter(tab => !tab.hidden);
+  const index = tabs.indexOf(event.target);
+  if (index < 0) return;
+  const destinations = { ArrowLeft: (index + tabs.length - 1) % tabs.length,
+    ArrowRight: (index + 1) % tabs.length, Home: 0, End: tabs.length - 1 };
+  if (!Object.hasOwn(destinations, event.key)) return;
+  event.preventDefault();
+  const tab = tabs[destinations[event.key]];
+  selectSettingsTab(tab);
+  tab.focus();
+});
+function refreshSettingsControls() {
+  byId("glass-controls").hidden = byId("rail").value === "solid";
+  for (const output of preferences.querySelectorAll("output")) {
+    const id = output.htmlFor[0];
+    const unit = id === "glass-blur" || id === "text-size" ? " px" : "%";
+    output.value = byId(id).value + unit;
+  }
+}
 preferences.addEventListener("input", event => {
-  if (appearanceControls.has(event.target)) queueVisualPreview();
+  if (!appearanceControls.has(event.target)) return;
+  refreshSettingsControls();
+  queueVisualPreview();
 });
 byId("reset-visual").addEventListener("click", () => {
   for (const [control, key] of appearanceControls) {
@@ -1038,6 +1090,7 @@ byId("reset-visual").addEventListener("click", () => {
     else control.value = visualDefaults[key];
   }
   byId("custom-color").hidden = true;
+  refreshSettingsControls();
   queueVisualPreview();
 });
 preferences.addEventListener("close", async () => {
@@ -1056,38 +1109,56 @@ preferences.addEventListener("close", async () => {
     await openImport().catch(() => report("profileUnavailable"));
     return;
   }
-  if (preferences.returnValue !== "save") return;
-  const selected = byId("avatar-file").files[0];
+});
+preferences.addEventListener("cancel", event => {
+  if (savingSettings) event.preventDefault();
+});
+preferences.querySelector("form").addEventListener("submit", async event => {
+  if (event.submitter && event.submitter.value !== "save") return;
+  event.preventDefault();
+  if (savingSettings) return;
   const session = vault;
+  const status = byId("settings-status");
+  const fail = key => { status.hidden = false; status.textContent = labels[key] ?? labels.storageFailed; };
   const values = Object.fromEntries(Object.entries(settingIds).map(([key, id]) => [key, byId(id).value.trim()]));
   if (session?.account && (!values.displayName || /[\p{Cc}]/u.test(values.displayName))) {
-    appearance();
-    report("displayNameInvalid");
+    selectSettingsTab(settingsTabs[0]);
+    byId("display-name").focus();
+    fail("displayNameInvalid");
     return;
   }
-  const memoryEnabled = byId("memory-enabled").checked;
-  const visualValues = previewVisual();
-  const memories = memoryDraft.filter(entry => entry.content.trim()).map(entry => ({ ...entry, content: entry.content.trim() }));
-  let avatar = avatarDraft ?? "";
-  if (selected) {
-    try { avatar = await avatarImage(selected); }
-    catch { appearance(); report("invalidAvatar"); return; }
-    finally { byId("avatar-file").value = ""; }
-  }
-  if (vault !== session) return;
-  const nameChanged = state.aiName !== values.aiName;
-  state = { ...state, ...values, ...visualValues, memoryEnabled, avatar, memories };
-  refreshIdentity();
-  renderWelcome();
-  appearance();
-  if (nameChanged) renderMessages();
+  const visual = previewVisual();
+  const next = { ...state, ...values, ...Object.fromEntries(Object.keys(visualDefaults).map(key => [key, visual[key]])),
+    personality: "", memoryEnabled: byId("memory-enabled").checked, avatar: avatarDraft ?? "",
+    memories: memoryDraft.filter(entry => entry.content.trim()).map(entry => ({ ...entry, content: entry.content.trim() })) };
+  const selected = byId("avatar-file").files[0];
   savingSettings = true;
+  status.hidden = true;
+  for (const button of settingsButtons) button.disabled = true;
+  settingsNav.inert = preferences.querySelector(".preferences-content").inert = true;
   updateControls();
-  const saved = await persist();
-  savingSettings = false;
-  updateControls();
-  if (saved && vault === session) report("saved");
+  try {
+    if (selected) {
+      try { next.avatar = await avatarImage(selected); }
+      catch { fail("invalidAvatar"); return; }
+    }
+    await session.save(next);
+    if (vault !== session) return;
+    state = next;
+    refreshIdentity();
+    preferences.close("save");
+    appearance();
+    report("saved");
+  } catch (error) {
+    fail(error.message);
+  } finally {
+    savingSettings = false;
+    for (const button of settingsButtons) button.disabled = false;
+    settingsNav.inert = preferences.querySelector(".preferences-content").inert = false;
+    updateControls();
+  }
 });
+
 confirmDelete.addEventListener("close", () => {
   if (confirmDelete.returnValue !== "delete") return;
   state.chats = state.chats.filter(chat => chat.id !== deleting);
@@ -1338,7 +1409,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
         messages: modelHistory(chat.messages, 48000 - textFiles.reduce((sum, file) => sum + file.text.length, 0)),
         ...(!vault?.account && !temporary && {
           personality: state.personality, memory: state.memoryEnabled ? state.memory : "",
-          aiName: state.aiName, instructions: state.instructions, style: state.style, length: state.length,
+          instructions: state.instructions, style: state.style, length: state.length,
         }),
         language: state.language, mode: state.mode, files: textFiles, ...(vision && { vision }), search, temporary: Boolean(temporary),
       }),

@@ -215,13 +215,16 @@ try {
     });
     await button("Settings").click();
     await page.locator("#preferences").getByLabel("Display name", { exact: true }).fill("Khat friend");
-    await label("Custom instructions").fill("Mit navn er tjek.");
     await label("Profile picture").setInputFiles({
       name: "avatar.jpg", mimeType: "image/jpeg", buffer: Buffer.from(image, "base64"),
     });
+    await page.getByRole("tab", { name: "Assistant" }).click();
+    await label("Custom instructions").fill("Mit navn er tjek.");
+    await page.getByRole("tab", { name: "Appearance" }).click();
     await label("First orb color").fill("#446688");
     await label("Orb style").selectOption("aurora");
     await label("Enable animations").uncheck();
+    await page.getByRole("tab", { name: "Memory" }).click();
     await label("Include memory in AI requests").check();
     const saveSettings = page.waitForResponse(response => response.url().endsWith("/api/workspace") &&
       response.request().method() === "POST" && response.status() === 204);
@@ -275,6 +278,7 @@ try {
     assert.equal(await page.locator("html").getAttribute("data-orb-state"), "idle");
     await button("Close").click();
     await button("Settings").click();
+    await page.getByRole("tab", { name: "Appearance" }).click();
     await label("Enable animations").check();
     await button("Save").click();
     await page.waitForFunction(() => document.documentElement.dataset.motion === "on");
