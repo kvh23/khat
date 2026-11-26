@@ -36,7 +36,7 @@ The browser test intercepts chat and Studio requests and simulates browser speec
 The shared `khat` / `KHAT_PASSWORD` gate still protects assets and every API route. When D1 is available, account actions and generation also require an individual account session. The shared password is still required on each device. When the production D1 binding has not been configured, the app continues using its existing local encrypted profiles.
 
 - Usernames use 3–24 letters, numbers or underscores. Passwords are 12–128 characters. The SQLite-backed PasswordHasher Durable Object performs salted PBKDF2-SHA-256 (600,000 iterations) within Durable Objects' CPU allowance. It stores no passwords or hashes. D1 contains only salted password hashes and digests of the random invitation and session tokens.
-- Invitations permit one successful registration. Admin-created invitations expire after seven days. Account sessions expire after seven days and are limited to five per user. Cookies use Secure, HttpOnly, SameSite=Strict and the `__Host-` prefix. Signing out ends the current session. Disabling or deleting an account revokes all sessions. The browser may still remember the separate shared Basic Auth login. Email recovery and self-service password resets are outside this release.
+- Invitations permit one successful registration. Admin-created invitations expire after seven days. Account sessions expire after seven days and are limited to five per user. Cookies use Secure, HttpOnly, SameSite=Strict and the `__Host-` prefix. Signing out ends the current session. Disabling or deleting an account revokes all sessions. Production uses the Khat login page. A domain change requires signing in again because the session cookie is host-only. Email recovery and self-service password resets are outside this release.
 - Chats, messages, approved memories, visual preferences, and compact Studio and avatar images are stored in D1, separately for each account. Data is readable by the Cloudflare account owner through D1. The application admin dashboard shows accounts, daily counters, and limits. It has no routes for viewing another person's private chats, memories, or images.
 - Conversation changes sync at sign-in, on focus, and periodically while the workspace is idle and visible. A revision check prevents simultaneous edits on two devices from silently overwriting each other. On a conflict, reload to get the currently saved version. Account export contains current server data. Keep a copy of any unsaved draft before reloading.
 - The account migration tool in Settings copies chats, the former memory note, and Studio images that fit the account gallery. The old vault and any images that could not be copied stay on the device. Account visual preferences begin with defaults.
@@ -64,7 +64,7 @@ The account smoke test starts an isolated local Worker and D1 on port 8799, appl
 ```sh
 npx wrangler d1 migrations apply khat-accounts --local --config wrangler.accounts.jsonc --persist-to .wrangler/accounts-review
 node scripts/bootstrap-invite.mjs --local --config wrangler.accounts.jsonc --persist-to .wrangler/accounts-review
-npx wrangler dev --config wrangler.accounts.jsonc --port 8798 --persist-to .wrangler/accounts-review --var KHAT_PASSWORD:local-test-only
+npx wrangler dev --config wrangler.accounts.jsonc --port 8798 --persist-to .wrangler/accounts-review
 ```
 
 On http://localhost:8798 sign in to the outer gate as `khat` with `local-test-only`. Choose **Use an invitation** and redeem the local administrator code. This config intentionally omits the AI binding.
@@ -80,7 +80,7 @@ On a checkout of the approved changes, use an authenticated Wrangler CLI. Use a 
    npx wrangler d1 migrations apply khat-accounts --remote --config wrangler.jsonc
    ```
 
-2. Ensure the new D1 entry has `"migrations_dir": "migrations"`. Add `"vars": { "ACCOUNTS_REQUIRED": "true" }` so the account APIs fail closed if the bindings are missing. Keep both Durable Object bindings and both migration tags, and keep `AI` and the deployed **KHAT_PASSWORD** secret. Never put the secret in source or chat.
+2. Ensure the new D1 entry has `"migrations_dir": "migrations"`. Add `"vars": { "ACCOUNTS_REQUIRED": "true" }` so the account APIs fail closed if the bindings are missing. Keep both Durable Object bindings, both migration tags, and the `AI` binding. The account-enabled Worker ignores the legacy shared secret. Keep any existing secret in Cloudflare for rollback until the cutover is verified.
 3. Generate the initial operator invitation from an authorized terminal. Share only member invitations and keep the bootstrap code private.
 
    ```sh
