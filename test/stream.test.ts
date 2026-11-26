@@ -26,3 +26,16 @@ describe("SSE decoding", () => {
 		}
 	});
 });
+
+it("holds back split reasoning tags and never displays reasoning deltas", async () => {
+	const values = [
+		{ response: "<th" }, { response: "ink>private" }, { response: " notes</think>" },
+		{ choices: [{ delta: { reasoning_content: "internal" } }] }, { response: "Answer" },
+	];
+	const encoder = new TextEncoder();
+	const packets = values.map(value => encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
+	packets.push(encoder.encode("data: [DONE]\n\n"));
+	const update = vi.fn();
+	expect(await readReply(stream(packets), update)).toBe("Answer");
+	expect(update.mock.calls).toEqual([["Answer"]]);
+});

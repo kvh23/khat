@@ -10,26 +10,34 @@
   <script type="module" src="/chat.js"></script>
 </head>
 <body>
-  <div class="shell">
+  <div class="shell" hidden>
     <aside id="sidebar" aria-label="Conversation history">
-      <div class="brand"><span class="mark" aria-hidden="true">k.</span> Khat</div>
+      <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span> Khat</div>
       <button type="button" id="new" class="new"><span aria-hidden="true">＋</span><span data-label="newChat">New chat</span></button>
+      <button type="button" id="studio-open" class="side-button"><span aria-hidden="true">✧</span> <span data-label="studio">Studio</span></button>
       <div class="history">
+        <div class="history-tools">
+          <label class="sr-only" for="history-search" data-label="searchHistory">Search conversations</label>
+          <input id="history-search" type="search" autocomplete="off">
+          <button type="button" id="archives" aria-pressed="false" data-label="archive">Archive</button>
+        </div>
         <h2 data-label="history">History</h2>
         <ul id="history"></ul>
         <p id="no-history" data-label="noHistory">Your conversations will appear here.</p>
       </div>
       <button type="button" id="settings" class="settings"><span aria-hidden="true">⚙</span><span data-label="settings">Settings</span></button>
+      <button type="button" id="lock" class="side-button" aria-label="Lock profile"><span aria-hidden="true">◉</span><span id="profile-name"></span></button>
     </aside>
     <main>
       <header class="top">
         <button type="button" class="menu" id="menu" aria-controls="sidebar" aria-expanded="false"><span aria-hidden="true">☰</span><span data-label="menu">Menu</span></button>
+        <button type="button" id="collapse" aria-controls="sidebar" aria-expanded="true" data-label="collapse">Hide sidebar</button>
         <span id="chat-title">New chat</span>
         <button type="button" id="language" class="language" aria-label="Switch language">DA</button>
       </header>
       <div id="timeline" tabindex="0" aria-label="Conversation">
         <section id="welcome" class="welcome">
-          <span class="mark hero-mark" aria-hidden="true">k.</span>
+          <span class="mark hero-mark" aria-hidden="true"><i></i><i></i><i></i></span>
           <h1 data-label="welcome">What’s on your mind?</h1>
           <p data-label="intro">A space to think, write, and figure things out.</p>
           <div class="suggestions">
@@ -46,6 +54,13 @@
           <label for="prompt" class="sr-only" data-label="prompt">Message Khat</label>
           <textarea id="prompt" rows="2" maxlength="8000" placeholder="Message Khat…"></textarea>
           <div class="toolbar">
+            <label class="sr-only" for="mode" data-label="model">Model</label>
+            <select id="mode">
+              <option value="auto" data-label="auto">Automatic</option>
+              <option value="instant">Khat Instant</option>
+              <option value="think">Khat Think</option>
+              <option value="pro">Khat Pro</option>
+            </select>
             <input id="upload" type="file" multiple accept=".txt,.md,.csv,.json,.log,.js,.ts,.py,.html,.css,.yaml,.yml,.xml" hidden>
             <button type="button" id="attach"><span aria-hidden="true">＋</span> <span data-label="attach">Attach</span></button>
             <button type="button" id="search" aria-pressed="false"><span aria-hidden="true">⌕</span> <span data-label="search">Search Wikipedia</span></button>
@@ -54,7 +69,7 @@
             <button id="stop" class="send" type="button" aria-label="Stop" hidden><span aria-hidden="true">■</span></button>
           </div>
         </form>
-        <p id="status" role="status"></p>
+        <div class="response-status"><span id="activity" class="activity" hidden aria-hidden="true"></span><p id="status" role="status"></p></div>
       </footer>
     </main>
   </div>
@@ -62,10 +77,34 @@
     <form method="dialog">
       <h2 id="preferences-title" data-label="settings">Settings</h2>
       <p data-label="privacy">History and settings stay in this browser. Relevant chat text, memory, and attached text go to Workers AI when you send a message.</p>
+      <fieldset>
+        <legend data-label="appearance">Appearance</legend>
+        <label for="theme" data-label="theme">Theme</label>
+        <select id="theme"><option value="auto" data-label="auto">Automatic</option><option value="light" data-label="light">Light</option><option value="dark" data-label="dark">Dark</option></select>
+        <label for="accent" data-label="accent">Accent color</label>
+        <select id="accent"><option value="ink" data-label="ink">Graphite</option><option value="blue" data-label="blue">Glacier</option><option value="green" data-label="green">Pine</option><option value="rose" data-label="rose">Clay</option><option value="custom" data-label="custom">Custom</option></select>
+        <div id="custom-color" hidden><label for="custom-accent" data-label="customAccent">Custom accent</label><input id="custom-accent" type="color" value="#526c83"></div>
+      </fieldset>
+      <fieldset>
+      <legend data-label="assistant">Assistant</legend>
+      <label for="ai-name" data-label="aiName">AI name</label>
+      <input id="ai-name" maxlength="40" placeholder="Khat">
+      <label for="response-length" data-label="length">Response length</label>
+      <select id="response-length"><option value="brief" data-label="brief">Brief</option><option value="balanced" data-label="balanced">Balanced</option><option value="detailed" data-label="detailed">Detailed</option></select>
+      <label for="response-style" data-label="communication">Communication style</label>
+      <select id="response-style"><option value="balanced" data-label="balanced">Balanced</option><option value="direct" data-label="direct">Direct</option><option value="warm" data-label="warm">Warm</option><option value="formal" data-label="formal">Formal</option></select>
       <label for="personality" data-label="personality">AI personality</label>
       <textarea id="personality" maxlength="1000" rows="3"></textarea>
+      <label for="instructions" data-label="instructions">Custom instructions</label>
+      <textarea id="instructions" maxlength="2000" rows="3"></textarea>
+      </fieldset>
+      <fieldset>
+      <legend data-label="memory">Memory</legend>
+      <label class="check"><input type="checkbox" id="memory-enabled"> <span data-label="enableMemory">Include memory in AI requests</span></label>
       <label for="memory" data-label="memory">Memory</label>
-      <textarea id="memory" maxlength="3000" rows="5"></textarea>
+      <textarea id="memory" maxlength="3000" rows="4"></textarea>
+      <button id="clear-memory" type="button" data-label="clearMemory">Clear memory</button>
+      </fieldset>
       <div class="dialog-actions">
         <button type="submit" value="cancel" data-label="cancel">Cancel</button>
         <button type="submit" class="primary" value="save" data-label="save">Save</button>
@@ -80,6 +119,75 @@
         <button type="submit" class="primary" value="delete" data-label="delete">Delete</button>
       </div>
     </form>
+  </dialog>
+  <dialog id="profiles" aria-labelledby="profile-title">
+    <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span> Khat</div>
+    <h1 id="profile-title" data-label="profiles">Your space, kept private.</h1>
+    <p data-label="profilesInfo">Profiles encrypt chats and images on this device. Choose a unique passphrase and keep it safe.</p>
+    <form id="unlock-form">
+      <label for="profile-list" data-label="profile">Profile</label>
+      <select id="profile-list" required></select>
+      <label for="unlock-password" data-label="passphrase">Passphrase</label>
+      <input type="password" id="unlock-password" required maxlength="128" autocomplete="current-password">
+      <button type="submit" class="primary" data-label="unlock">Unlock</button>
+    </form>
+    <form id="create-form">
+      <label for="new-profile-name" data-label="profileName">Profile name</label>
+      <input id="new-profile-name" required maxlength="40" autocomplete="off">
+      <label for="new-profile-password" data-label="newPassphrase">New passphrase (12 characters minimum)</label>
+      <input id="new-profile-password" type="password" required minlength="12" maxlength="128" autocomplete="new-password">
+      <label id="legacy-label" class="check" hidden><input id="import-legacy" type="checkbox"> <span data-label="importHistory">Import existing local conversations and settings</span></label>
+      <button type="submit" class="primary" data-label="createProfile">Create profile</button>
+    </form>
+    <button id="toggle-create" type="button" data-label="createProfile">Create profile</button>
+    <button id="profile-language" type="button" aria-label="Switch language">DA</button>
+    <p id="profile-status" role="status"></p>
+  </dialog>
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <form method="dialog">
+      <h2 id="edit-title" data-label="edit">Edit message</h2>
+      <label for="edit-text" data-label="editLabel">Message text</label>
+      <textarea id="edit-text" maxlength="8000" required rows="5"></textarea>
+      <p data-label="editInfo">Sending this edit replaces later replies in this conversation.</p>
+      <div class="dialog-actions">
+        <button type="submit" value="cancel" formnovalidate data-label="cancel">Cancel</button>
+        <button type="submit" value="send" class="primary" data-label="send">Send</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="conversation-options" aria-labelledby="conversation-options-title">
+    <form method="dialog">
+      <h2 id="conversation-options-title" data-label="conversationOptions">Conversation options</h2>
+      <label for="conversation-name" data-label="conversationName">Conversation name</label>
+      <input id="conversation-name" maxlength="64">
+      <div class="dialog-actions">
+        <button type="submit" value="delete" data-label="delete">Delete</button>
+        <button type="submit" value="archive" id="archive-conversation" data-label="archive">Archive</button>
+        <button type="submit" value="cancel" data-label="cancel">Cancel</button>
+        <button type="submit" value="rename" class="primary" data-label="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="studio" aria-labelledby="studio-title">
+    <header class="dialog-header"><h2 id="studio-title" data-label="studio">Studio</h2><button type="button" id="studio-close" data-label="close">Close</button></header>
+    <form id="image-form">
+      <label for="image-prompt" data-label="imagePrompt">Describe an image</label>
+      <textarea id="image-prompt" name="prompt" maxlength="900" required rows="3"></textarea>
+      <div class="studio-options">
+        <div><label for="ratio" data-label="ratio">Aspect ratio</label>
+        <select id="ratio" name="ratio"><option value="square" data-label="square">Square</option><option value="portrait" data-label="portrait">Portrait</option><option value="landscape" data-label="landscape">Landscape</option></select></div>
+        <div><label for="image-style" data-label="imageStyle">Image style</label>
+        <select id="image-style" name="style"><option value="plain" data-label="plain">None</option><option value="editorial" data-label="editorial">Editorial photo</option><option value="illustration" data-label="illustration">Illustration</option><option value="modern" data-label="modern">Scandinavian graphic</option></select></div>
+      </div>
+      <button id="generate" type="submit" class="primary" data-label="generate">Generate image</button>
+    </form>
+    <p id="image-status" role="status"></p>
+    <h3 data-label="imageHistory">Image history</h3>
+    <div id="gallery"></div>
+  </dialog>
+  <dialog id="image-preview" aria-labelledby="preview-title">
+    <form method="dialog" class="dialog-header"><h2 id="preview-title" data-label="preview">Preview</h2><button data-label="close">Close</button></form>
+    <img id="full-image" alt="">
   </dialog>
 </body>
 </html>
