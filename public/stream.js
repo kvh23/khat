@@ -4,7 +4,7 @@ function publicReply(text, flush = false) {
   return flush ? withoutReasoning : withoutReasoning.replace(partialStart, "");
 }
 
-export async function readReply(body, update) {
+export async function readReply(body, update, filtered = false) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -23,7 +23,7 @@ export async function readReply(body, update) {
         buffer = buffer.slice(end + 2);
         if (!data) continue;
         if (data === "[DONE]") {
-          const reply = publicReply(text, true).trimStart();
+          const reply = (filtered ? text : publicReply(text, true)).trimStart();
           if (!reply) throw new Error("modelFailed");
           return reply;
         }
@@ -32,7 +32,7 @@ export async function readReply(body, update) {
         const delta = event.response ?? event.choices?.[0]?.delta?.content;
         if (typeof delta === "string") {
           text += delta;
-          const reply = publicReply(text);
+          const reply = filtered ? text : publicReply(text);
           if (reply !== lastReply) {
             lastReply = reply;
             update(reply);

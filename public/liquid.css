@@ -51,38 +51,41 @@ body {
 @keyframes ambient-drift { from { transform: translate3d(-2%, -1%, 0); } to { transform: translate3d(5%, 3%, 0) scale(1.08); } }
 
 .liquid-glass {
-  --surface-highlight: var(--glint);
   position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 var(--surface-highlight), inset 0 -1px 0 var(--prism), 0 8px 28px var(--abyss);
+  box-shadow: inset 0 1px 0 var(--glint), inset 0 -1px 0 var(--prism), 0 6px 22px var(--abyss);
 }
 @supports (background: color-mix(in srgb, white 50%, transparent)) {
-  .liquid-glass {
-    background: radial-gradient(120px 96px at var(--reflection-x, 40%) var(--reflection-y, -56px),
-        var(--surface-highlight), transparent 92%),
-      linear-gradient(132deg, var(--prism), transparent 25% 83%, var(--prism)),
+  :root:not([data-glass-tier="opaque"]) .liquid-glass {
+    background: linear-gradient(152deg, var(--glint) -29%, transparent 24% 83%, var(--prism)),
       color-mix(in srgb, var(--panel) var(--glass-opacity), transparent);
   }
-  .liquid-glass.reflecting { --surface-highlight: color-mix(in srgb, var(--glint), white 10%); }
 }
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .liquid-glass:not(select, #status) {
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
-    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
-  }
-}
-.liquid-glass.reflecting:not(select, #status)::after {
-  content: "";
+.glass-lens { pointer-events: none; position: absolute; inset: 0; overflow: hidden; border-radius: inherit; }
+.glass-gleam {
   pointer-events: none;
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(75px 47px at var(--reflection-x) var(--reflection-y), var(--prism), transparent);
-  filter: url("#refraction");
-  opacity: .45;
+  top: 0;
+  left: 0;
+  width: 140px;
+  height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, var(--glint), var(--prism) 35%, transparent 72%);
+  opacity: 0;
+  transition: opacity 150ms ease;
 }
-.shell { padding: 10px; column-gap: 9px; }
+:root[data-glass-tier="full"] .glass-gleam { filter: url("#refraction"); }
+:root:not([data-glass-tier="full"]) .glass-gleam { display: none; }
+:root[data-glass-tier="full"] #composer:focus-within,
+:root[data-glass-tier="full"] dialog[open].liquid-glass:not(:has(~ dialog[open])) {
+  -webkit-backdrop-filter: blur(min(12px, var(--glass-blur))) saturate(115%);
+  backdrop-filter: blur(min(12px, var(--glass-blur))) saturate(115%);
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  .liquid-glass { background: var(--panel); border-color: currentColor; }
+}
+.shell { padding: 10px; column-gap: 9px; overflow: hidden; }
 .shell.collapsed { column-gap: 0; }
 aside.liquid-glass {
   padding: 21px 14px max(16px, env(safe-area-inset-bottom));
@@ -99,13 +102,13 @@ aside.liquid-glass {
 #composer.liquid-glass {
   border-radius: 23px;
   padding: 8px;
-  transition: border-color 220ms var(--spring), box-shadow 220ms var(--spring);
+  transition: border-color 140ms ease;
 }
 #composer:focus-within {
   border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
   box-shadow: inset 0 1px 1px var(--glint), 0 0 0 3px var(--prism), 0 12px 30px var(--abyss);
 }
-#prompt { transition: height 160ms var(--spring); }
+@supports (field-sizing: content) { #prompt { field-sizing: content; min-height: 56px; max-height: 170px; } }
 #mode.liquid-glass { box-shadow: inset 0 1px 0 var(--glint); }
 #status.liquid-glass { border-radius: 99px; padding: 3px 9px; }
 #status:empty { display: none; }
@@ -152,7 +155,7 @@ aside.liquid-glass {
     radial-gradient(ellipse at 38% 51%, var(--orb-one) 0%, var(--orb-two) 76%);
   box-shadow: inset 0 0 0 1px #fff9, inset 0 -9px 18px #22135169,
     0 0 calc(35px * var(--orb-glow)) color-mix(in srgb, var(--orb-two) 42%, transparent);
-  transition: transform 320ms var(--spring), box-shadow 450ms ease;
+  transition: transform 200ms var(--spring);
 }
 .orb i { animation: liquid-wave calc(var(--orb-speed) * var(--orb-tempo)) var(--spring) infinite alternate; opacity: calc(var(--orb-detail) * .66); }
 .orb i:nth-child(2) { animation-name: liquid-cross; mix-blend-mode: screen; }
@@ -174,7 +177,7 @@ aside.liquid-glass {
 :root[data-orb-state="speaking"] { --orb-speed: 4s; --orb-scale: 1.07; }
 :root[data-orb-state="speaking"] .orb::before { animation-duration: 1.05s; }
 :root[data-orb-state="image"] .orb i { animation-name: liquid-cross; }
-:root[data-orb-state="error"] .orb { --orb-scale: .96; filter: saturate(.64); }
+:root[data-orb-state="error"] .orb { --orb-scale: .96; opacity: .72; }
 :root[data-orb-style="intelligence"] .orb i { inset: 16%; border-radius: 29% 71% 62% 38%; }
 :root[data-orb-style="minimal"] .orb i { animation: none; }
 :root[data-orb-style="classic"] .orb i { animation-name: classic-breathe; }
@@ -183,14 +186,13 @@ aside.liquid-glass {
 @media (max-width: 760px) {
   .shell { padding: 6px; row-gap: 0; }
   aside.liquid-glass { padding-inline: 12px; }
-  .liquid-glass:not(select, #status) { -webkit-backdrop-filter: blur(min(10px, var(--glass-blur))); backdrop-filter: blur(min(10px, var(--glass-blur))); }
   .top.liquid-glass { padding-inline: 2px 6px; }
   .toolbar button, .toolbar select { font-size: .75rem; padding-inline: .36rem; }
   .dialog-actions { bottom: -16px; }
   .atmosphere::after { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .liquid-glass.reflecting::after { display: none; }
+  .glass-gleam { display: none; }
 }
 
 dialog.liquid-glass { position: fixed; }
@@ -226,3 +228,21 @@ body > svg[aria-hidden] { position: absolute; }
 :root[data-conversation][data-orb-state="idle"] .orb-small::before {
   animation: none;
 }
+
+:root[data-glass-tier="light"] .atmosphere::before,
+:root[data-glass-tier="light"] .atmosphere::after,
+:root[data-glass-tier="opaque"] .atmosphere::before,
+:root[data-glass-tier="opaque"] .atmosphere::after { animation: none; }
+:root[data-glass-tier="light"] .orb i:nth-child(3) { display: none; }
+.orb { overflow: hidden; isolation: isolate; }
+.orb::after {
+  background: radial-gradient(ellipse at 78% 81%, #cba6ff34, transparent 32%),
+    radial-gradient(ellipse at 26% 18%, #fff6 1%, transparent 17%);
+}
+:root[data-orb-state="image"] .orb i:nth-child(2) {
+  background: radial-gradient(ellipse at 32% 60%, #74dfdca6, transparent 54%),
+    radial-gradient(ellipse at 78% 20%, #ffacd87e, transparent 40%);
+}
+:root[data-orb-state="responding"] .orb::before { animation: none; transition: opacity 160ms ease; }
+
+:root[data-orb-state="listening"] .orb { --orb-scale: calc(1.02 + var(--voice-level) * .26); }

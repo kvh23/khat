@@ -53,6 +53,13 @@ try {
   assert.deepEqual((await call("/api/session")).body, { account: null });
   assert.equal((await call("/api/chat", { data: {}, status: 401 })).body.error, "signInRequired");
   const admin = await signed("/api/register", { username: "administrator", password, invite });
+  await call("/api/admin/user", { actor: admin, data: {
+    id: admin.account.id, active: false, textLimit: 24, imageLimit: 5,
+  }, status: 204 });
+  const personalLimits = (await call("/api/usage", { actor: admin })).body;
+  assert.equal(personalLimits.textLimit, 24);
+  assert.equal(personalLimits.imageLimit, 5);
+
   assert.equal(admin.account.role, "admin");
   const issued = (await call("/api/admin/invite", { actor: admin, data: {} })).body.invite;
 
@@ -164,11 +171,16 @@ try {
         return destination.stream;
       };
     });
+    let browserGalleryReads = 0;
+    page.on("request", request => {
+      if (request.method() === "GET" && request.url().endsWith("/api/studio-history")) browserGalleryReads++;
+    });
     await page.goto(base);
     await page.getByLabel("Username", { exact: true }).fill(admin.account.username);
     await page.locator("#account-auth").getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await page.getByRole("heading", { name: "What’s on your mind?" }).waitFor();
+    assert.equal(browserGalleryReads, 0);
     const expected = [];
     const checks = [];
     await page.route("**/api/chat", async route => {
@@ -235,6 +247,7 @@ try {
     await label("Describe an image").fill("Mint silhouette");
     await button("Generate image").click();
     await page.getByText("Image ready.", { exact: true }).waitFor();
+    assert.equal(browserGalleryReads, 1);
     assert.equal((await call("/api/studio-history", { actor: admin })).body.images[0].prompt, "Mint silhouette");
     assert.equal(await page.locator("html").getAttribute("data-orb-state"), "idle");
     await button("Close").click();
@@ -244,16 +257,18 @@ try {
     await page.waitForFunction(() => document.documentElement.dataset.motion === "on");
     await button("Dictate").click();
     await page.waitForFunction(() => document.documentElement.dataset.orbState === "listening");
-    await page.waitForFunction(() => parseFloat(document.documentElement.style.getPropertyValue("--voice-level")) > .05);
+    await page.waitForFunction(() => parseFloat(getComputedStyle(document.querySelector(".orb-small")).getPropertyValue("--voice-level").trim()) > .05);
     await page.waitForFunction(() => document.documentElement.dataset.orbState === "idle");
-    assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue("--voice-level")), "0");
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector(".orb-small")).getPropertyValue("--voice-level").trim()), "0");
 
+    const existingMessage = await page.locator(".message.user").first().elementHandle();
     await page.evaluate(() => { window.voiceFixture = true; });
     await button("Voice").click();
     await button("Listen").click();
     await page.waitForFunction(() => document.documentElement.dataset.orbState === "speaking");
     assert.equal(await page.evaluate(() => window.spokenFixture), "Hello");
     assert.equal(expected.at(-1).messages.at(-1).content, "Talk about the stars");
+    assert.equal(await existingMessage.evaluate(element => element.isConnected), true);
     await page.locator("#voice-room").getByRole("button", { name: "Stop", exact: true }).click();
     await page.locator("#voice-room").getByRole("button", { name: "Close", exact: true }).click();
     await page.waitForFunction(() => document.documentElement.dataset.orbState === "idle");

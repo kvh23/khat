@@ -196,6 +196,7 @@ async function chat(request: Request, env: Env, account: Account | null) {
 					...headers,
 					"content-type": "text/event-stream; charset=utf-8",
 					"x-khat-model": model,
+					"x-khat-stream-filtered": "1",
 					"x-khat-memory": encodeURIComponent(suggestion),
 					"x-khat-fallback": String(index > 0),
 					"x-khat-sources": encodeURIComponent(JSON.stringify(sources.map(({ title, url }) => ({ title, url })))),
