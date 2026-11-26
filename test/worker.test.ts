@@ -15,7 +15,7 @@ function fixture() {
 	const quota = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 204 }));
 	const env = {
 		USAGE: { idFromName: () => "test", get: () => ({ fetch: quota }) } as unknown as DurableObjectNamespace,
-		KHAT_PASSWORD: password, AI: { run } as unknown as Ai,
+		KHAT_PASSWORD: password, ACCOUNTS_REQUIRED: "false", AI: { run } as unknown as Ai,
 		ASSETS: { fetch: assets }, AUTH_LIMIT: { limit: authLimit }, CHAT_LIMIT: { limit: chatLimit },
 	} satisfies Env;
 	const request = (path: string, init?: RequestInit) => worker.fetch(new Request(`https://khat.example${path}`, init), env);
@@ -45,6 +45,17 @@ describe("Worker authentication and routing", () => {
 		expect(await response.text()).toBe("asset");
 		expect(response.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
 		expect(response.headers.get("cache-control")).toBe("private, no-store");
+	});
+
+	it("fails closed when production authentication bindings are absent", async () => {
+		const { env, post, run } = fixture();
+		for (const flag of [undefined, "true"]) {
+			Object.assign(env, { ACCOUNTS_REQUIRED: flag });
+			const response = await post();
+			expect(response.status).toBe(503);
+			expect(response.headers.has("www-authenticate")).toBe(false);
+		}
+		expect(run).not.toHaveBeenCalled();
 	});
 
 	it("fails closed if the secret is missing", async () => {

@@ -223,11 +223,13 @@ ${personalization ? `Apply the following user preferences when compatible with t
 export default {
 	async fetch(request, env) {
 		const url = new URL(request.url);
-		if (!env.KHAT_PASSWORD) return error(503, "unconfigured");
+		// Basic Authentication is reserved for the explicitly configured local legacy harness.
+		const legacy = env.ACCOUNTS_REQUIRED === "false" && !env.DB && !env.PASSWORDS;
+		if (legacy ? !env.KHAT_PASSWORD : !env.DB || !env.PASSWORDS) return error(503, "unconfigured");
 
 		try {
 			const ip = request.headers.get("CF-Connecting-IP") ?? "local";
-			if (!authorized(request, env.KHAT_PASSWORD)) {
+			if (legacy && !authorized(request, env.KHAT_PASSWORD ?? "")) {
 				if (!(await env.AUTH_LIMIT.limit({ key: ip })).success) {
 					return error(429, "limited", { "retry-after": "60" });
 				}
@@ -245,7 +247,6 @@ export default {
 			const gets = ["/api/session", "/api/workspace", "/api/export", "/api/admin", "/api/studio-history", "/api/usage"];
 			const posts = ["/api/login", "/api/register", "/api/logout", "/api/delete-account", "/api/workspace",
 				"/api/admin/invite", "/api/admin/user", "/api/studio-history"];
-			if ((env.ACCOUNTS_REQUIRED === "true" || env.DB) && (!env.DB || !env.PASSWORDS)) return error(503, "unconfigured");
 			if (!generation && (!env.DB || ![...gets, ...posts].includes(path))) return error(404, "notFound");
 			if (!(request.method === "GET" && gets.includes(path)) && !(request.method === "POST" && (generation || posts.includes(path)))) {
 				return error(405, "invalid", { allow: gets.includes(path) && posts.includes(path) ? "GET, POST" : gets.includes(path) ? "GET" : "POST" });
@@ -259,14 +260,13 @@ export default {
 			}
 			const account = env.DB ? await authenticate(request, env.DB) : null;
 			const publicRoute = ["/api/session", "/api/login", "/api/register"].includes(path);
-			if (env.DB && !publicRoute) {
+			if (!legacy && !publicRoute) {
 				if (!account) return error(401, "signInRequired");
 				// Reject requests from a stale tab after the browser cookie changes accounts.
 				const scope = request.headers.get("X-Khat-Account");
 				if (scope !== account.id) return error(409, "sessionChanged");
 			}
 			if (generation) {
-				if (env.DB && !account) return error(401, "signInRequired");
 				if (!(await env.CHAT_LIMIT.limit({ key: "khat" })).success) return error(429, "limited", { "retry-after": "60" });
 				if (path === "/api/chat") return await chat(request, env, account);
 			}

@@ -8,7 +8,6 @@ import { chromium } from "playwright";
 
 const base = "http://localhost:8799";
 const password = "local-only account passphrase";
-const gate = "Basic " + Buffer.from("khat:local-test-only").toString("base64");
 const local = await mkdtemp(join(tmpdir(), "khat-d1-"));
 const config = ["--config", "wrangler.accounts.jsonc", "--persist-to", local];
 const wrangler = "node_modules/wrangler/bin/wrangler.js";
@@ -16,11 +15,10 @@ let worker;
 let browser;
 let log = "";
 
-async function call(path, { actor, data, status = 200, headers = {}, noGate = false } = {}) {
+async function call(path, { actor, data, status = 200, headers = {} } = {}) {
   const response = await fetch(base + path, {
     method: data === undefined ? "GET" : "POST",
     headers: {
-      ...(!noGate && { Authorization: gate }),
       ...(actor && { Cookie: actor.cookie, "X-Khat-Account": actor.account.id }),
       ...(data !== undefined && { "Content-Type": "application/json" }),
       ...headers,
@@ -43,15 +41,30 @@ try {
   execFileSync(process.execPath, [wrangler, "d1", "migrations", "apply", "khat-accounts", "--local", ...config], { stdio: "ignore" });
   const invite = execFileSync(process.execPath, ["scripts/bootstrap-invite.mjs", "--local", ...config],
     { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().split(" ").at(-1);
-  worker = spawn(process.execPath, [wrangler, "dev", "--port", "8799", ...config, "--var", "KHAT_PASSWORD:local-test-only"], { detached: true });
+  worker = spawn(process.execPath, [wrangler, "dev", "--port", "8799", ...config], { detached: true });
   worker.stdout.on("data", data => { log = (log + data).slice(-5000); });
   worker.stderr.on("data", data => { log = (log + data).slice(-5000); });
   for (let count = 0; count < 100 && !log.includes("Ready on"); count++) await delay(100);
   assert.match(log, /Ready on/);
 
-  assert.equal((await call("/api/session", { noGate: true, status: 401 })).body.error, "unauthorized");
+  const landing = await fetch(base);
+  assert.equal(landing.status, 200);
+  assert.equal(landing.headers.has("www-authenticate"), false);
+  assert.match(await landing.text(), /<title>Khat AI<\/title>/);
   assert.deepEqual((await call("/api/session")).body, { account: null });
+  const anonymousAI = await call("/api/image", { data: {}, status: 401 });
+  assert.equal(anonymousAI.headers.has("www-authenticate"), false);
+  assert.equal((await call("/api/register", { data: { username: "uninvited", displayName: "Fixture", password }, status: 400 })).body.error, "inviteInvalid");
   assert.equal((await call("/api/chat", { data: {}, status: 401 })).body.error, "signInRequired");
+  for (const [path, data] of [
+    ["/api/workspace"], ["/api/workspace", {}], ["/api/studio-history"], ["/api/studio-history", {}],
+    ["/api/export"], ["/api/usage"], ["/api/admin"], ["/api/admin/invite", {}], ["/api/admin/user", {}],
+    ["/api/logout", {}], ["/api/delete-account", {}], ["/api/chat", {}], ["/api/image", {}],
+  ]) {
+    assert.equal((await call(path, { data, status: 401, headers: {
+      Cookie: `__Host-khat_session=${"X".repeat(43)}`, "X-Khat-Account": "fake",
+    } })).body.error, "signInRequired");
+  }
   const admin = await signed("/api/register", { username: "administrator", displayName: "Admin", password, invite });
   await call("/api/admin/user", { actor: admin, data: {
     id: admin.account.id, active: false, textLimit: 24, imageLimit: 5,
@@ -139,7 +152,7 @@ try {
   if (!process.argv.includes("--browser")) process.exitCode = 0;
   else {
     browser = await chromium.launch({ executablePath: process.env.KHAT_CHROMIUM_PATH });
-    const context = await browser.newContext({ httpCredentials: { username: "khat", password: "local-test-only" }, locale: "en-US" });
+    const context = await browser.newContext({ locale: "en-US" });
     const page = await context.newPage();
     await page.addInitScript(() => {
       window.SpeechRecognition = class {
@@ -177,6 +190,7 @@ try {
       if (request.method() === "GET" && request.url().endsWith("/api/studio-history")) browserGalleryReads++;
     });
     await page.goto(base);
+    assert.equal(await page.title(), "Khat AI");
     await page.getByLabel("Username", { exact: true }).fill(admin.account.username);
     await page.locator("#account-auth").getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -185,6 +199,9 @@ try {
     await page.locator("#name-onboarding").getByRole("button", { name: "Save", exact: true }).click();
     await page.locator("#name-onboarding").waitFor({ state: "hidden" });
     assert.equal((await read(admin)).preferences.displayName, "Alex");
+    await page.reload();
+    await page.locator("#welcome h1").waitFor();
+    assert.equal(await page.locator("#account-auth").isVisible(), false);
     assert.equal(browserGalleryReads, 0);
     const expected = [];
     const checks = [];
@@ -327,6 +344,8 @@ try {
     await page.getByText("administrator", { exact: true }).waitFor();
     await button("Close").click();
     await button("Sign out").click();
+    await button("Sign in").waitFor();
+    await page.reload();
     await button("Sign in").waitFor();
     const newInvite = (await call("/api/admin/invite", { actor: admin, data: {} })).body.invite;
     await button("Use an invitation").click();
