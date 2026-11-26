@@ -1,23 +1,11 @@
-/**
- * Type definitions for the LLM chat application.
- */
-
-export interface Env {
-	/**
-	 * Binding for the Workers AI API.
-	 */
-	AI: Ai;
-
-	/**
-	 * Binding for static assets.
-	 */
-	ASSETS: { fetch: (request: Request) => Promise<Response> };
+interface RateLimiter {
+	limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
-/**
- * Represents a chat message.
- */
-export interface ChatMessage {
-	role: "system" | "user" | "assistant";
-	content: string;
+export interface Env {
+	AI: Ai;
+	ASSETS: { fetch(request: Request): Promise<Response> };
+	KHAT_PASSWORD?: string;
+	AUTH_LIMIT: RateLimiter;
+	CHAT_LIMIT: RateLimiter;
 }
