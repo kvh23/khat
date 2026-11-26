@@ -8,4 +8,5 @@ export interface Env {
 	KHAT_PASSWORD?: string;
 	AUTH_LIMIT: RateLimiter;
 	CHAT_LIMIT: RateLimiter;
+	USAGE: DurableObjectNamespace;
 }

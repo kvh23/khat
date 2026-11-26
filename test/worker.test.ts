@@ -8,21 +8,23 @@ const prompt = { role: "user", content: "Tell me about Copenhagen" };
 const eventStream = 'data: {"response":"Hello"}\n\ndata: [DONE]\n\n';
 
 function fixture() {
-	const run = vi.fn(async () => new Response(eventStream).body);
+	const run = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => new Response(eventStream).body);
 	const assets = vi.fn(async () => new Response("asset"));
 	const authLimit = vi.fn(async () => ({ success: true }));
 	const chatLimit = vi.fn(async () => ({ success: true }));
+	const quota = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 204 }));
 	const env = {
+		USAGE: { idFromName: () => "test", get: () => ({ fetch: quota }) } as unknown as DurableObjectNamespace,
 		KHAT_PASSWORD: password, AI: { run } as unknown as Ai,
 		ASSETS: { fetch: assets }, AUTH_LIMIT: { limit: authLimit }, CHAT_LIMIT: { limit: chatLimit },
 	} satisfies Env;
 	const request = (path: string, init?: RequestInit) => worker.fetch(new Request(`https://khat.example${path}`, init), env);
-	const post = (input: unknown = { messages: [prompt] }, headers: Record<string, string> = {}) =>
-		request("/api/chat", {
+	const post = (input: unknown = { messages: [prompt] }, headers: Record<string, string> = {}, path = "/api/chat") =>
+		request(path, {
 			method: "POST", headers: { authorization: credentials(), "content-type": "application/json", ...headers },
 			body: JSON.stringify(input),
 		});
-	return { env, run, assets, authLimit, chatLimit, request, post };
+	return { env, run, assets, authLimit, chatLimit, request, post, quota };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -130,5 +132,81 @@ describe("chat and sources", () => {
 		expect(run).not.toHaveBeenCalled();
 		run.mockRejectedValue(new Error("internal details"));
 		expect(await (await post()).json()).toEqual({ error: "modelFailed" });
+	});
+});
+
+describe("model routing and quota", () => {
+	it.each([
+		["instant", "Tell me about Copenhagen", "@cf/meta/llama-3.1-8b-instruct-fp8", "instant"],
+		["think", "Tell me about Copenhagen", "@cf/qwen/qwen3-30b-a3b-fp8", "think"],
+		["pro", "Tell me about Copenhagen", "@cf/google/gemma-4-26b-a4b-it", "pro"],
+		["auto", "Explain Copenhagen", "@cf/meta/llama-3.1-8b-instruct-fp8", "instant"],
+		["auto", "Compare two ways to solve this", "@cf/qwen/qwen3-30b-a3b-fp8", "think"],
+		["auto", "x".repeat(3500), "@cf/google/gemma-4-26b-a4b-it", "pro"],
+	])("routes %s to a real model", async (mode, content, id, served) => {
+		const { post, run } = fixture();
+		const response = await post({ mode, messages: [{ ...prompt, content }], length: "brief", aiName: "Aster",
+			style: "direct", instructions: "Answer in a list." });
+		expect(response.status).toBe(200);
+		expect(response.headers.get("x-khat-model")).toBe(served);
+		expect(response.headers.get("x-khat-fallback")).toBe("false");
+		expect(run.mock.calls[0][0]).toBe(id);
+		expect(run.mock.calls[0][1]).toMatchObject({ max_tokens: 640 });
+		expect(JSON.stringify(run.mock.calls[0][1])).toContain("Answer in a list.");
+	});
+
+	it("charges a fallback separately and tells the client which model answered", async () => {
+		const { post, run, quota } = fixture();
+		run.mockRejectedValueOnce(new Error("provider unavailable"));
+		const response = await post({ mode: "pro", messages: [prompt] });
+		expect(response.headers.get("x-khat-model")).toBe("legacy");
+		expect(response.headers.get("x-khat-fallback")).toBe("true");
+		expect(quota.mock.calls.map(([, init]) => JSON.parse(String(init.body)).kind)).toEqual(["text", "retry"]);
+	});
+
+	it("blocks an exhausted quota or unsupported model ID before provider access", async () => {
+		const { post, run, quota } = fixture();
+		quota.mockResolvedValueOnce(new Response(null, { status: 429 }));
+		expect((await post()).status).toBe(429);
+		expect((await post({ mode: "@cf/something/paid", messages: [prompt] })).status).toBe(400);
+		expect(run).not.toHaveBeenCalled();
+	});
+});
+
+describe("Studio", () => {
+	const input = { prompt: "A watercolor of pine trees", ratio: "landscape", style: "illustration" };
+	const call = (f: ReturnType<typeof fixture>) => f.post(input, {}, "/api/image");
+	const jpeg = "/9j/eA==";
+	it("authenticates image generation and validates presets", async () => {
+		const f = fixture();
+		expect((await f.request("/api/image", { method: "POST" })).status).toBe(401);
+		expect((await f.post({ ...input, ratio: "__proto__" }, {}, "/api/image")).status).toBe(400);
+		expect(f.run).not.toHaveBeenCalled();
+	});
+
+	it("generates with FLUX only after prompt approval and returns only approved output", async () => {
+		const f = fixture();
+		f.run.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ image: jpeg })
+			.mockResolvedValueOnce({ choices: [{ message: { content: "ALLOW" } }] });
+		expect(await (await call(f)).json()).toEqual({ image: jpeg });
+		expect(f.run.mock.calls[1]).toEqual(["@cf/black-forest-labs/flux-1-schnell", {
+			steps: 4, prompt: expect.stringContaining("wide horizontal crop"),
+		}]);
+		expect(JSON.stringify(f.run.mock.calls[2])).toContain("data:image/jpeg;base64,");
+		expect(JSON.parse(String(f.quota.mock.calls[0][1].body))).toEqual({ kind: "image", neurons: 500 });
+	});
+
+	it("fails closed on unsafe prompts, output classifier failures, and invalid images", async () => {
+		const blocked = fixture();
+		blocked.run.mockResolvedValueOnce({ response: "BLOCK" });
+		expect((await call(blocked)).status).toBe(422);
+		expect(blocked.run).toHaveBeenCalledTimes(1);
+		const failed = fixture();
+		failed.run.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ image: jpeg })
+			.mockRejectedValueOnce(new Error("classifier unavailable"));
+		expect(await (await call(failed)).json()).toEqual({ error: "imageFailed" });
+		const invalid = fixture();
+		invalid.run.mockResolvedValueOnce({ response: "ALLOW" }).mockResolvedValueOnce({ image: "<svg>" });
+		expect((await call(invalid)).status).toBe(502);
 	});
 });
