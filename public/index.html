@@ -146,7 +146,7 @@
         <label for="orb-size" data-label="orbSize">Orb size</label><input type="range" id="orb-size" min="65" max="120">
         <label for="text-size" data-label="textSize">Chat text size</label><input type="range" id="text-size" min="14" max="22">
         <label for="density" data-label="density">Density</label><select id="density"><option value="comfortable" data-label="comfortable">Comfortable</option><option value="compact" data-label="compact">Compact</option></select>
-        <label for="rail" data-label="rail">Sidebar material</label><select id="rail"><option value="glass" data-label="glass">Glass</option><option value="solid" data-label="solid">Solid</option></select>
+        <label for="rail" data-label="rail">Surface style</label><select id="rail"><option value="glass" data-label="glass">Liquid Glass</option><option value="solid" data-label="solid">Solid</option></select>
         <label class="check"><input type="checkbox" id="ambience"> <span data-label="ambience">Atmospheric background</span></label>
         <button type="button" id="reset-visual" data-label="resetVisual">Reset visual settings</button>
       </fieldset>
@@ -247,12 +247,14 @@
     </form>
   </dialog>
   <dialog id="admin" aria-labelledby="admin-title">
-    <form method="dialog" class="dialog-header"><h2 id="admin-title" data-label="admin">Administration</h2><button data-label="close">Close</button></form>
+    <form method="dialog" class="dialog-header"><h2 id="admin-title" data-label="admin">Administration</h2><button class="modal-close" data-label="close">Close</button></form>
+    <div class="admin-overview">
     <p id="admin-stats"></p>
     <p data-label="usageHelp">Daily generation limits reset at midnight UTC. Saved chats and images have separate storage limits.</p>
     <button id="issue-invite" type="button" class="primary" data-label="issueInvite">Create single-use invite</button>
     <input id="invite-code" aria-label="Invitation code" readonly hidden>
     <p id="admin-status" role="status"></p>
+    </div>
     <div id="admin-users"></div>
   </dialog>
   <dialog id="profiles" aria-labelledby="profile-title">
@@ -304,7 +306,7 @@
     </form>
   </dialog>
   <dialog id="studio" aria-labelledby="studio-title">
-    <header class="dialog-header"><h2 id="studio-title" data-label="studio">Studio</h2><div id="studio-orb" class="orb orb-studio" aria-hidden="true" hidden><i></i><i></i><i></i></div><button type="button" id="studio-close" data-label="close">Close</button></header>
+    <header class="dialog-header"><h2 id="studio-title" data-label="studio">Studio</h2><div id="studio-orb" class="orb orb-studio" aria-hidden="true" hidden><i></i><i></i><i></i></div><button type="button" id="studio-close" class="modal-close" data-label="close">Close</button></header>
     <form id="image-form">
       <label for="image-prompt" data-label="imagePrompt">Describe an image</label>
       <textarea id="image-prompt" name="prompt" maxlength="900" required rows="4"></textarea>

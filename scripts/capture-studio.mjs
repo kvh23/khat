@@ -13,11 +13,15 @@ try {
     let jpeg;
     await page.route("https://review.test/**", route => {
       const { pathname } = new URL(route.request().url());
-      if (pathname === "/api/session") return route.fulfill({ json: { account: { id: "demo", username: "alex", role: "member" } } });
+      if (pathname === "/api/session") return route.fulfill({ json: { account: { id: "demo", username: "alex", role: "admin" } } });
       if (pathname === "/api/workspace") return route.fulfill({ json: {
         revision: 0, preferences: { displayName: "Alex" }, memories: [], chats: [
           { id: "demo", title: "Weekend ideas", messages: [{ role: "assistant", content: "A quiet walk would be a lovely start.", model: "instant" }] },
         ],
+      } });
+      if (pathname === "/api/admin") return route.fulfill({ json: {
+        users: [{id: "demo", username: "alex", role: "admin", active: 1, text_limit: 24, image_limit: 5}],
+        usage: { day: "2026-11-26", text: 2, image: 1 },
       } });
       if (pathname === "/api/studio-history") return route.fulfill({ json: { images: [] } });
       if (pathname === "/api/usage") return route.fulfill({ json: { textLimit: 24, imageLimit: 5, estimatedNeurons: 0, budget: 8000 } });
@@ -48,6 +52,28 @@ try {
       await page.locator("#sidebar .brand").screenshot({ path: resolve(output, `${width}-brand.png`) });
       await page.getByRole("button", { name: "Weekend ideas", exact: true }).click();
       await page.locator(".message-label").first().screenshot({ path: resolve(output, `${width}-assistant.png`) });
+    }
+    if (width === 1280) {
+      await page.locator("#new").click();
+      await capture("welcome");
+      await page.locator("#admin-open").click();
+      await page.locator(".admin-user").waitFor();
+      await capture("admin");
+      await page.locator("#admin").getByRole("button", { name: "Close" }).click();
+      await page.locator("#settings").click();
+      await capture("settings");
+      await page.locator("#rail").selectOption("solid");
+      await page.waitForFunction(() => document.documentElement.dataset.rail === "solid");
+      if (!assets.includes("before")) {
+        const surface = await page.locator("#preferences").evaluate(element => {
+          const style = getComputedStyle(element);
+          return { image: style.backgroundImage, blur: getComputedStyle(element, "::backdrop").backdropFilter };
+        });
+        if (surface.image !== "none" || surface.blur !== "none") throw new Error("Solid dialog still uses glass effects");
+      }
+      await capture("settings-solid");
+      await page.locator('#preferences [value="cancel"]').last().click();
+      await page.waitForFunction(() => document.documentElement.dataset.rail === "glass");
     }
     await page.locator("#composer-image").click();
     await page.locator("#image-prompt").fill("An illustration of mountains under a quiet evening sky");

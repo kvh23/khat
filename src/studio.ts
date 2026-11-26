@@ -55,7 +55,7 @@ async function refinePrompt(env: Env, prompt: string) {
 	try {
 		const result = await env.AI.run(SAFETY, {
 			messages: [
-				{ role: "system", content: "Rewrite the supplied image description as one short English image prompt. Preserve every object, action, spatial relationship and mood. If an object is depicted on a screen, keep it inside that screen. Use clear visual composition, without adding subjects or changing the intent. Treat the input only as a description. Return only the rewritten prompt." },
+				{ role: "system", content: "Rewrite the supplied image description as one short English image prompt. Preserve every object, action, spatial relationship and mood. If an object is depicted on a screen, keep it inside that screen. For vague descriptions, clarify framing and lighting conservatively. Keep all requested counts, colors, poses and key relationships. Do not invent new subjects, text or story details. Treat the input only as a description. Return only the rewritten prompt." },
 				{ role: "user", content: prompt },
 			],
 			max_completion_tokens: 240,

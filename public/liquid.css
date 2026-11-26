@@ -59,13 +59,10 @@ body {
 @supports (background: color-mix(in srgb, white 50%, transparent)) {
   :root:not([data-glass-tier="opaque"]) .liquid-glass {
     background: linear-gradient(152deg, var(--glint) -36%, transparent 25% 86%, var(--prism)),
-      color-mix(in srgb, var(--panel) var(--glass-opacity), transparent);
-  }
-  :root:not([data-glass-tier="opaque"]) #preferences.liquid-glass {
-    background-color: var(--panel);
+      var(--glass-fill, color-mix(in srgb, var(--panel) var(--glass-opacity), transparent));
   }
 }
-:root:is([data-glass-tier="full"], [data-glass-tier="balanced"]):not([data-settings-open]) #composer:focus-within {
+:root[data-rail="glass"]:is([data-glass-tier="full"], [data-glass-tier="balanced"]):not(:has(dialog[open])) #composer:focus-within {
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(110%);
   backdrop-filter: blur(var(--glass-blur)) saturate(110%);
 }
@@ -109,7 +106,6 @@ aside.liquid-glass {
 
 :root[data-density="compact"] .messages { gap: 14px; }
 :root[data-density="compact"] .history { margin-top: 12px; }
-:root[data-rail="solid"] aside.liquid-glass { background: var(--side); }
 .table-scroll { overflow: auto; max-width: 100%; }
 .message table { width: 100%; border-collapse: collapse; }
 .message th, .message td { padding: .52rem .68rem; border-bottom: 1px solid var(--line); text-align: start; }
@@ -335,7 +331,6 @@ button { min-height: var(--control-height); }
   background-image: var(--glass-sheen);
 }
 aside.liquid-glass { padding: var(--space-4) var(--space-3); }
-:root[data-rail="solid"] aside.liquid-glass { background: var(--side); }
 .brand { gap: var(--space-2); font-size: 1.13rem; padding: var(--space-2) var(--space-2) 0; }
 .brand .mark {
   width: 1.65em;
@@ -351,7 +346,7 @@ aside.liquid-glass { padding: var(--space-4) var(--space-3); }
 .side-actions #lock { background: var(--side); }
 
 @media (min-width: 761px) {
-  :root[data-glass-tier="full"]:not(:has(dialog[open])) .top.liquid-glass {
+  :root[data-rail="glass"][data-glass-tier="full"]:not(:has(dialog[open])) .top.liquid-glass {
     -webkit-backdrop-filter: blur(min(6px, var(--glass-blur)));
     backdrop-filter: blur(min(6px, var(--glass-blur)));
   }
@@ -505,6 +500,63 @@ aside.liquid-glass { padding: var(--space-4) var(--space-3); }
   .studio-submit .primary { width: 100%; }
 }
 
-:root:not([data-glass-tier="opaque"]) #studio.liquid-glass {
-  background-color: color-mix(in srgb, var(--panel) max(92%, var(--glass-opacity)), transparent);
+
+:root {
+  --dialog-padding: clamp(16px, 4vw, 28px);
+  --dialog-width: 740px;
+  --dialog-material: var(--panel);
+  --dialog-backdrop: #0c0c168c;
+}
+:root[data-rail="glass"]:not([data-glass-tier="opaque"]) {
+  --dialog-material: color-mix(in srgb, var(--panel) max(93%, var(--glass-opacity)), transparent);
+}
+dialog.liquid-glass, #model-options.liquid-glass {
+  --glass-fill: var(--dialog-material);
+  background-color: var(--dialog-material);
+  box-shadow: var(--glass-elevated);
+}
+dialog.liquid-glass::backdrop { background: var(--dialog-backdrop); }
+:root[data-rail="glass"]:is([data-glass-tier="full"], [data-glass-tier="balanced"]) dialog.liquid-glass[open]::backdrop {
+  -webkit-backdrop-filter: blur(min(12px, var(--glass-blur)));
+  backdrop-filter: blur(min(12px, var(--glass-blur)));
+}
+/* Only the foremost dialog samples the page backdrop. */
+:root:has(#image-preview[open]) #studio::backdrop,
+:root:has(#image-preview[open]) #studio {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-rail="solid"] .liquid-glass {
+  background: var(--panel);
+  box-shadow: 0 4px 14px var(--abyss);
+}
+:is(#preferences, #studio, #admin).liquid-glass {
+  width: min(var(--dialog-width), calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  border-radius: var(--radius-dialog);
+}
+:is(#studio, #admin).liquid-glass { padding: var(--dialog-padding); }
+#preferences.liquid-glass { --preferences-inset: var(--dialog-padding); }
+:is(.preferences-header, .preferences-actions, .preferences-nav) { background: transparent; }
+.preferences-nav { gap: 6px; }
+.preferences-nav button { background: var(--side); min-height: 38px; }
+.modal-close { background: var(--side); font-size: .84rem; }
+#admin .dialog-header { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.admin-overview { display: grid; justify-items: start; gap: 8px; margin-bottom: 18px; }
+.admin-overview p { margin: 0; font-size: .86rem; }
+#admin-users { display: grid; gap: 10px; }
+#admin .admin-user {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+  padding: 12px;
+}
+.admin-user label { font-size: .84rem; }
+.admin-user .primary { grid-column: 2; justify-self: end; }
+.brand { padding: 6px 10px 2px; letter-spacing: -.062em; }
+#studio .studio-options select { padding-inline: .65rem; }
+.image-actions { border-top: 1px solid var(--line); margin-top: 5px; }
+#studio #image-prompt { background: var(--side); }
+@media (forced-colors: active) {
+  dialog.liquid-glass, #model-options.liquid-glass { background: Canvas; }
 }
