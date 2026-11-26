@@ -38,6 +38,22 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
   let preview;
   let ephemeral = false;
   let resultOnly;
+  const loaded = new WeakMap();
+  let opening = 0;
+
+  function loadGallery() {
+    const session = vault();
+    if (!session?.account) return Promise.resolve();
+    if (!loaded.has(session)) {
+      loaded.set(session, session.loadImages().then(({ images }) => {
+        if (vault() === session) state().images = images;
+      }).catch(error => {
+        loaded.delete(session);
+        throw error;
+      }));
+    }
+    return loaded.get(session);
+  }
 
   function render() {
     preview = null;
@@ -88,7 +104,7 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
     }
   }
 
-  function open(prompt = "", temporary = false) {
+  async function open(prompt = "", temporary = false) {
     if (dialog.open) return;
     ephemeral = temporary;
     resultOnly = undefined;
@@ -96,6 +112,20 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
     form.elements.prompt.value = prompt.slice(0, 900);
     render();
     dialog.showModal();
+    if (temporary || !vault()?.account) {
+      submit.disabled = false;
+      return;
+    }
+    const request = ++opening;
+    submit.disabled = true;
+    try {
+      await loadGallery();
+      if (request !== opening || !dialog.open) return;
+      render();
+      submit.disabled = false;
+    } catch {
+      if (request === opening && dialog.open) status.textContent = labels().galleryUnavailable;
+    }
   }
   for (const id of ["studio-open", "composer-image"]) document.getElementById(id).addEventListener("click", () => open());
   document.getElementById("studio-close").addEventListener("click", () => dialog.close());
@@ -116,6 +146,7 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
     if (busy) event.preventDefault();
   });
   dialog.addEventListener("close", () => {
+    opening++;
     preview?.close();
     gallery.replaceChildren();
     form.reset();
@@ -127,7 +158,7 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
     const data = Object.fromEntries(new FormData(form));
     if (data.enhance) data.enhance = true;
     if (data.quality === "balanced") delete data.quality;
-    if (busy || !data.prompt.trim()) return;
+    if (busy || submit.disabled || !data.prompt.trim()) return;
     if (!ephemeral && state().images.length >= 12) {
       status.textContent = labels().galleryFull;
       return;
@@ -174,5 +205,5 @@ export function setupStudio({ state, labels, persist, report, vault, onUsage }) 
       onUsage();
     }
   });
-  return { open };
+  return { open, loadGallery };
 }

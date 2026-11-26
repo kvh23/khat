@@ -1,60 +1,41 @@
 const root = document.documentElement;
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-const pointer = matchMedia("(pointer: fine)");
-const selector = ".liquid-glass";
-let surface;
-let frame = 0;
-let x;
-let y;
-
-export function glassPreferences(state) {
-  root.dataset.ambience = state.ambience ? "on" : "off";
-  root.dataset.density = state.density;
-  root.dataset.rail = state.rail;
-  root.style.setProperty("--glass-opacity", `${state.glassOpacity}%`);
-  root.style.setProperty("--glass-blur", `${state.glassBlur}px`);
-  root.style.setProperty("--chat-type", `${state.textSize}px`);
-  root.style.setProperty("--orb-glow", String(state.orbGlow / 100));
-  root.style.setProperty("--orb-tempo", String(2 - state.orbSpeed / 100));
-  root.style.setProperty("--orb-detail", String(state.orbDetail / 100));
-  root.style.setProperty("--orb-user-size", String(state.orbSize / 100));
+const contrast = matchMedia("(prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active)");
+const supportsBlur = CSS.supports("backdrop-filter", "blur(1px)") || CSS.supports("-webkit-backdrop-filter", "blur(1px)");
+export function glassPreferences(state, previous) {
+  for (const [key, value] of [
+    ["ambience", state.ambience ? "on" : "off"], ["density", state.density], ["rail", state.rail],
+  ]) {
+    if (state[key] !== previous?.[key]) root.dataset[key] = value;
+  }
+  for (const [key, property, value] of [
+    ["glassOpacity", "--glass-opacity", `${state.glassOpacity}%`],
+    ["glassBlur", "--glass-blur", `${state.glassBlur}px`],
+    ["textSize", "--chat-type", `${state.textSize}px`],
+    ["orbGlow", "--orb-glow", state.orbGlow / 100],
+    ["orbSpeed", "--orb-tempo", 2 - state.orbSpeed / 100],
+    ["orbDetail", "--orb-detail", state.orbDetail / 100],
+    ["orbSize", "--orb-user-size", state.orbSize / 100],
+  ]) {
+    if (state[key] !== previous?.[key]) root.style.setProperty(property, value);
+  }
 }
 
-function reset() {
-  if (frame) cancelAnimationFrame(frame);
-  frame = 0;
-  surface?.classList.remove("reflecting");
-  surface = null;
+function materialTier() {
+  const cores = navigator.hardwareConcurrency || 4;
+  const memory = navigator.deviceMemory ?? 4;
+  root.dataset.glassTier = contrast.matches || !supportsBlur ? "opaque" :
+    reduced.matches || cores < 4 || memory < 4 ? "light" :
+    cores >= 6 ? "full" : "balanced";
 }
 
 export function mountGlass() {
   for (const element of document.querySelectorAll(".top, aside, #composer, dialog, #mode, #status")) {
     element.classList.add("liquid-glass");
   }
-  document.addEventListener("pointermove", event => {
-    if (!pointer.matches || reduced.matches || document.hidden || root.dataset.motion === "off") return;
-    const next = event.target instanceof Element ? event.target.closest(selector) : null;
-    if (surface !== next) {
-      reset();
-      surface = next;
-    }
-    if (!surface) return;
-    x = event.clientX;
-    y = event.clientY;
-    if (frame) return;
-    frame = requestAnimationFrame(() => {
-      frame = 0;
-      if (!surface?.isConnected) return;
-      const rect = surface.getBoundingClientRect();
-      surface.style.setProperty("--reflection-x", `${x - rect.left}px`);
-      surface.style.setProperty("--reflection-y", `${y - rect.top}px`);
-      surface.classList.add("reflecting");
-    });
-  }, { passive: true });
-  document.addEventListener("pointerleave", reset);
+  materialTier();
+  for (const query of [reduced, contrast]) query.addEventListener("change", materialTier);
   document.addEventListener("visibilitychange", () => {
     root.toggleAttribute("data-paused", document.hidden);
-    if (document.hidden) reset();
   });
-  reduced.addEventListener("change", reset);
 }

@@ -7,14 +7,15 @@ let meter;
 let settle;
 let pulse;
 
-export function motionPreferences(state) {
+export function motionPreferences(state, previous) {
   intensity = state.motionIntensity / 100;
   enabled = state.motionEnabled !== false && state.motionIntensity !== 0;
-  root.dataset.motion = enabled ? "on" : "off";
-  root.dataset.orbStyle = state.orbStyle;
-  root.style.setProperty("--orb-one", state.orbOne);
-  root.style.setProperty("--orb-two", state.orbTwo);
-  root.style.setProperty("--intensity", intensity);
+  const motion = enabled ? "on" : "off";
+  if (root.dataset.motion !== motion) root.dataset.motion = motion;
+  if (state.orbStyle !== previous?.orbStyle) root.dataset.orbStyle = state.orbStyle;
+  if (state.orbOne !== previous?.orbOne) root.style.setProperty("--orb-one", state.orbOne);
+  if (state.orbTwo !== previous?.orbTwo) root.style.setProperty("--orb-two", state.orbTwo);
+  if (state.motionIntensity !== previous?.motionIntensity) root.style.setProperty("--intensity", intensity);
   if ((!enabled || systemReduced.matches) && meter) endMeter();
 }
 
@@ -52,14 +53,15 @@ export function endMeter() {
   cancelAnimationFrame(capture.frame);
   capture.stream?.getTracks().forEach(track => track.stop());
   capture.context?.close().catch(() => {});
-  for (const key of ["level", "low", "high"]) root.style.setProperty(`--voice-${key}`, "0");
+  for (const orb of capture.orbs) orb.style.removeProperty("--voice-level");
+  for (const key of ["level", "low", "high"]) capture.waves?.style.removeProperty(`--voice-${key}`);
 }
 
 export async function startMeter() {
   if (!enabled || systemReduced.matches || !navigator.mediaDevices?.getUserMedia || meter) return;
   const Context = window.AudioContext || window.webkitAudioContext;
   if (!Context) return;
-  const capture = {};
+  const capture = { orbs: [...document.querySelectorAll(".orb-small, .orb-hero, .orb-voice")], waves: document.querySelector(".voice-waves") };
   meter = capture;
   try {
     const context = new Context();
@@ -91,9 +93,13 @@ export async function startMeter() {
           for (let bin = start; bin < end; bin++) energy += frequencies[bin];
           return energy / ((end - start) * 255);
         };
-        root.style.setProperty("--voice-level", smoothed.toFixed(3));
-        root.style.setProperty("--voice-low", average(1, 8).toFixed(3));
-        root.style.setProperty("--voice-high", average(8, 28).toFixed(3));
+        const level = smoothed.toFixed(3);
+        for (const orb of capture.orbs) {
+          if (orb.style.getPropertyValue("--voice-level") !== level) orb.style.setProperty("--voice-level", level);
+        }
+        capture.waves?.style.setProperty("--voice-level", level);
+        capture.waves?.style.setProperty("--voice-low", average(1, 8).toFixed(3));
+        capture.waves?.style.setProperty("--voice-high", average(8, 28).toFixed(3));
         last = time;
       }
       capture.frame = requestAnimationFrame(tick);

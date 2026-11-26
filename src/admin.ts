@@ -32,8 +32,9 @@ export async function adminRoute(path: string, input: Record<string, unknown>, e
 			typeof imageLimit !== "number" || !Number.isInteger(imageLimit) || imageLimit < 0 || imageLimit > 8)
 			return Response.json({ error: "invalid" }, { status: 400 });
 		const result = await db.batch([
-			db.prepare("UPDATE accounts SET active=?,text_limit=?,image_limit=? WHERE id=? AND role='member'")
-				.bind(Number(active), textLimit, imageLimit, id),
+			db.prepare(`UPDATE accounts SET active=CASE WHEN role='admin' THEN active ELSE ? END,
+				text_limit=?,image_limit=? WHERE id=? AND (role='member' OR id=?)`)
+				.bind(Number(active), textLimit, imageLimit, id, admin.id),
 			db.prepare(`DELETE FROM sessions WHERE owner=? AND EXISTS(SELECT 1 FROM accounts WHERE id=? AND active=0 AND role='member')`)
 				.bind(id, id),
 		]);

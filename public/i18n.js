@@ -185,3 +185,14 @@ Object.assign(translations.da, {
   professional: "Professionel", creative: "Kreativ", mentor: "Kritisk mentor", technical: "Teknisk",
   concise: "Kortfattet", educational: "Pædagogisk", friendly: "Venlig",
 });
+
+Object.assign(translations.en, {
+  usageHelp: "Daily request limits reset at midnight UTC. History holds up to 60 conversations and 12 saved images.",
+  studioStorageLimit: "Up to 12 saved images",
+  galleryUnavailable: "Studio history couldn’t load. Close Studio and open it again to retry.",
+});
+Object.assign(translations.da, {
+  usageHelp: "Den daglige kvote nulstilles ved midnat UTC. Historikken kan indeholde op til 60 chats og 12 gemte billeder.",
+  studioStorageLimit: "Op til 12 gemte billeder",
+  galleryUnavailable: "Studiehistorikken kunne ikke indlæses. Luk Studiet, og åbn det igen for at prøve igen.",
+});

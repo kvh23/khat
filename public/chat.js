@@ -48,6 +48,16 @@ const settingIds = {
   style: "response-style", personality: "personality", instructions: "instructions", memory: "memory",
   displayName: "display-name", orbStyle: "orb-style", orbOne: "orb-one", orbTwo: "orb-two", density: "density", rail: "rail",
 };
+const appearanceControls = new Map(Object.keys(visualDefaults).map(key => {
+  const control = byId(settingIds[key] ?? ranges[key] ?? (key === "motionEnabled" ? "motion-enabled" : key));
+  return [control, key];
+}));
+const settingsOrb = preferences.querySelector(".personal-preview");
+const previewObserver = new IntersectionObserver(([entry]) => {
+  settingsOrb.toggleAttribute("data-visible", preferences.open && entry.isIntersecting);
+}, { root: preferences });
+let previewFrame = 0;
+let appliedVisual;
 const modelNames = { instant: "Khat Instant", think: "Khat Think", pro: "Khat Pro", legacy: "Llama 3.3 70B", instantClassic: "Llama 3.1 8B", thinkClassic: "Qwen3 30B" };
 let state = defaults();
 let labels = translations[state.language];
@@ -76,11 +86,14 @@ let voiceReply = false;
 
 function renderUsage() {
   const target = byId("usage");
-  target.hidden = !dailyUsage;
+  const studioUsage = byId("studio-allowance");
+  target.hidden = studioUsage.hidden = !dailyUsage;
   if (!dailyUsage) return;
   const { text = 0, image = 0, textLimit, imageLimit, estimatedNeurons, budget } = dailyUsage;
   target.textContent = `${labels.dailyUsage} · ${labels.textLimit} ${text}/${textLimit} · ${labels.imageLimit} ${image}/${imageLimit} · ${labels.estimatedUsage} ${estimatedNeurons}/${budget}`;
   const near = (textLimit > 0 && text >= textLimit * .8) || (imageLimit > 0 && image >= imageLimit * .8) || estimatedNeurons >= budget * .8;
+  target.title = labels.usageHelp;
+  studioUsage.textContent = `${labels.dailyUsage} · ${labels.imageLimit} ${image}/${imageLimit} · ${labels.studioStorageLimit}`;
   target.toggleAttribute("data-near", near);
   if (near) target.textContent += ` · ${labels.nearLimit}`;
 }
@@ -125,20 +138,31 @@ async function persist() {
   }
 }
 
-function appearance(visual = state) {
-  glassPreferences(visual);
-  motionPreferences(visual);
+function applyVisual(visual) {
+  const previous = appliedVisual;
+  glassPreferences(visual, previous);
+  if (["motionEnabled", "motionIntensity", "orbStyle", "orbOne", "orbTwo"].some(key => visual[key] !== previous?.[key])) {
+    motionPreferences(visual, previous);
+  }
   const root = document.documentElement;
-  root.dataset.theme = visual.theme;
-  root.dataset.effectiveTheme = visual.theme === "auto" ? (systemDark.matches ? "dark" : "light") : visual.theme;
-  root.dataset.accent = visual.accent;
-  const hex = /^#[0-9a-f]{6}$/i.test(visual.customAccent) ? visual.customAccent : "#526c83";
-  const luminance = [0.2126, 0.7152, 0.0722].reduce((sum, weight, index) => {
-    const channel = parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
-    return sum + weight * (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
-  }, 0);
-  root.style.setProperty("--custom-accent", hex);
-  root.style.setProperty("--on-custom", luminance > 0.179 ? "#000" : "#fff");
+  if (visual.theme !== previous?.theme) root.dataset.theme = visual.theme;
+  const effective = visual.theme === "auto" ? (systemDark.matches ? "dark" : "light") : visual.theme;
+  if (root.dataset.effectiveTheme !== effective) root.dataset.effectiveTheme = effective;
+  if (visual.accent !== previous?.accent) root.dataset.accent = visual.accent;
+  if (visual.customAccent !== previous?.customAccent) {
+    const hex = /^#[0-9a-f]{6}$/i.test(visual.customAccent) ? visual.customAccent : "#526c83";
+    const luminance = [0.2126, 0.7152, 0.0722].reduce((sum, weight, index) => {
+      const channel = parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
+      return sum + weight * (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    }, 0);
+    root.style.setProperty("--custom-accent", hex);
+    root.style.setProperty("--on-custom", luminance > 0.179 ? "#000" : "#fff");
+  }
+  appliedVisual = Object.fromEntries(Array.from(appearanceControls.values(), key => [key, visual[key]]));
+}
+
+function appearance() {
+  applyVisual(preferences.open ? previewVisual() : state);
   shell.classList.toggle("collapsed", state.collapsed);
   byId("collapse").setAttribute("aria-expanded", String(!state.collapsed));
   byId("collapse").textContent = state.collapsed ? labels.expand : labels.collapse;
@@ -291,8 +315,7 @@ function accountForm() {
 async function openAccount(account) {
   setAccountScope(account);
   const workspace = await api("/api/workspace");
-  const { images } = await api("/api/studio-history");
-  enterProfile(accountVault(account, workspace, images));
+  enterProfile(accountVault(account, workspace));
 }
 
 async function initialize() {
@@ -440,8 +463,13 @@ byId("import-form").addEventListener("submit", async event => {
       if (session === vault) state = old;
       throw new Error(notice);
     }
+    const incoming = (local.data.images ?? []).slice().reverse();
     let imageError = false;
-    for (const image of (local.data.images ?? []).slice().reverse()) {
+    if (incoming.length) {
+      try { await studio.loadGallery(); }
+      catch { imageError = true; incoming.length = 0; }
+    }
+    for (const image of incoming) {
       if (session !== vault) return;
       if (state.images.length >= 12) { imageError = true; break; }
       if (state.images.some(current => current.id === image.id)) continue;
@@ -476,10 +504,12 @@ function closeMenu() {
   byId("menu").setAttribute("aria-expanded", "false");
 }
 
+let historyRows = [];
 function renderHistory() {
-  history.replaceChildren();
   const chat = current();
-  byId("chat-title").textContent = chat?.title || labels.newChat;
+  const title = chat?.title || labels.newChat;
+  const titleLabel = byId("chat-title");
+  if (titleLabel.textContent !== title) titleLabel.textContent = title;
   const query = byId("history-search").value.trim().toLocaleLowerCase();
   const entries = state.chats.filter(entry => Boolean(entry.archived) === archives &&
     (!query || entry.title.toLocaleLowerCase().includes(query) ||
@@ -487,26 +517,31 @@ function renderHistory() {
   byId("no-history").hidden = entries.length > 0;
   byId("no-history").textContent = query || archives ? labels.noMatches : labels.noHistory;
   byId("new").disabled = Boolean(pending);
-  for (const entry of entries) {
-    const item = node("li");
-    const select = node("button", entry.title);
-    select.type = "button";
-    select.disabled = Boolean(pending);
-    select.setAttribute("aria-current", String(entry.id === state.active));
-    select.addEventListener("click", () => openChat(entry.id));
-    const remove = node("button", "⋯");
-    remove.type = "button";
-    remove.disabled = Boolean(pending);
-    remove.setAttribute("aria-label", `${labels.conversationOptions}: ${entry.title}`);
-    remove.addEventListener("click", () => {
-      optionsId = entry.id;
-      byId("conversation-name").value = entry.title;
-      byId("archive-conversation").textContent = entry.archived ? labels.restore : labels.archive;
-      conversationOptions.returnValue = "";
-      conversationOptions.showModal();
+  if (entries.length !== historyRows.length || entries.some((entry, index) => entry !== historyRows[index].entry)) {
+    historyRows = entries.map(entry => {
+      const item = node("li");
+      const select = node("button");
+      select.type = "button";
+      select.addEventListener("click", () => openChat(entry.id));
+      const remove = node("button", "⋯");
+      remove.type = "button";
+      remove.addEventListener("click", () => {
+        optionsId = entry.id;
+        byId("conversation-name").value = entry.title;
+        byId("archive-conversation").textContent = entry.archived ? labels.restore : labels.archive;
+        conversationOptions.returnValue = "";
+        conversationOptions.showModal();
+      });
+      item.append(select, remove);
+      return { entry, item, select, remove };
     });
-    item.append(select, remove);
-    history.append(item);
+    history.replaceChildren(...historyRows.map(row => row.item));
+  }
+  for (const { entry, select, remove } of historyRows) {
+    if (select.textContent !== entry.title) select.textContent = entry.title;
+    select.disabled = remove.disabled = Boolean(pending);
+    select.setAttribute("aria-current", String(entry.id === state.active));
+    remove.setAttribute("aria-label", `${labels.conversationOptions}: ${entry.title}`);
   }
 }
 
@@ -581,6 +616,7 @@ function messageAction(actions, key, onClick) {
   button.disabled = Boolean(pending);
   button.addEventListener("click", onClick);
   actions.append(button);
+  return button;
 }
 
 function messageElement(message, streamed = false, index = -1) {
@@ -622,7 +658,7 @@ function messageElement(message, streamed = false, index = -1) {
     disclosure.append(node("summary", labels.sources));
     const list = node("ol");
     for (const source of message.sources) {
-      const href = webUrl(source.url);
+      const href = webUrl(source?.url);
       if (!href) continue;
       const link = node("a", source.title);
       link.href = href;
@@ -642,8 +678,10 @@ function messageElement(message, streamed = false, index = -1) {
     read.addEventListener("click", () => speak(message, read));
     actions.append(read);
   }
-  if (index === current()?.messages.length - 1 && current()?.messages[index - 1]?.role === "user") {
-    messageAction(actions, "regenerate", () => submitChat(current().messages[index - 1].content, index - 1, true));
+  if (index >= 1 && current()?.messages[index - 1]?.role === "user") {
+    const regenerate = messageAction(actions, "regenerate", () => submitChat(current().messages[index - 1].content, index - 1, true));
+    regenerate.classList.add("regenerate");
+    regenerate.hidden = index !== current().messages.length - 1;
   }
   element.append(actions);
   return element;
@@ -653,13 +691,47 @@ function scrollToLatest() {
   timeline.scrollTop = timeline.scrollHeight;
 }
 
-function renderMessages() {
+let rendered = [];
+let renderOwner;
+let renderLanguageId;
+let renderName;
+let atBottom = true;
+
+timeline.addEventListener("scroll", () => {
+  atBottom = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 95;
+}, { passive: true });
+
+function renderMessages(follow = true) {
   const chat = current();
-  byId("welcome").hidden = Boolean(chat?.messages.length);
-  stopSpeech();
-  document.documentElement.toggleAttribute("data-conversation", Boolean(chat?.messages.length));
-  messages.replaceChildren(...(chat?.messages ?? []).map((message, index) => messageElement(message, false, index)));
-  scrollToLatest();
+  const turns = chat?.messages ?? [];
+  byId("welcome").hidden = Boolean(turns.length);
+  document.documentElement.toggleAttribute("data-conversation", Boolean(turns.length));
+  let prefix = 0;
+  if (renderOwner === chat && renderLanguageId === state.language && renderName === state.aiName) {
+    while (prefix < turns.length && turns[prefix] === rendered[prefix]) prefix++;
+  }
+  if (messages.children.length > prefix) {
+    stopSpeech();
+    while (messages.children.length > prefix) messages.lastElementChild.remove();
+  }
+  const next = document.createDocumentFragment();
+  for (let index = prefix; index < turns.length; index++) next.append(messageElement(turns[index], false, index));
+  messages.append(next);
+  if (prefix !== rendered.length || prefix !== turns.length) {
+    const oldLast = messages.children[Math.max(0, prefix - 1)]?.querySelector(".regenerate");
+    if (oldLast) oldLast.hidden = prefix !== turns.length;
+    const button = messages.lastElementChild?.querySelector(".regenerate");
+    if (button) button.hidden = false;
+  }
+  for (const button of messages.querySelectorAll(".message-actions button")) button.disabled = Boolean(pending);
+  renderOwner = chat;
+  renderLanguageId = state.language;
+  renderName = state.aiName;
+  rendered = turns.slice();
+  if (follow) {
+    atBottom = true;
+    scrollToLatest();
+  }
 }
 
 function updateControls() {
@@ -724,15 +796,19 @@ function openChat(id) {
   animate(timeline, [{ opacity: .65, transform: "translateY(3px)" }, { opacity: 1, transform: "none" }], 180);
   closeMenu();
   report();
-  persist();
+  if (!vault?.account) persist();
   updateControls();
   if (window.matchMedia("(pointer: fine)").matches) prompt.focus();
 }
 
-systemDark.addEventListener("change", () => appearance(preferences.open ? previewVisual() : state));
+systemDark.addEventListener("change", appearance);
 byId("collapse").addEventListener("click", () => {
+  const prior = timeline.getBoundingClientRect().left;
   state.collapsed = !state.collapsed;
   appearance();
+  const shift = prior - timeline.getBoundingClientRect().left;
+  if (shift) animate(timeline, [{ transform: `translateX(${shift}px)`, opacity: .82 }, { transform: "none", opacity: 1 }], 180);
+  if (!state.collapsed) animate(byId("sidebar"), [{ transform: "translateX(-12px)", opacity: .4 }, { transform: "none", opacity: 1 }], 180);
   persist();
 });
 byId("mode").addEventListener("change", event => {
@@ -755,7 +831,8 @@ conversationOptions.addEventListener("close", () => {
   } else if (conversationOptions.returnValue === "archive") {
     entry.archived = !entry.archived;
     if (entry.id === state.active) openChat(null);
-    else { persist(); renderHistory(); }
+    else renderHistory();
+    persist();
   } else if (conversationOptions.returnValue === "rename") {
     entry.title = byId("conversation-name").value.trim() || entry.title;
     persist();
@@ -786,7 +863,7 @@ byId("language").addEventListener("click", () => {
 });
 function renderMemoryDraft() {
   const entries = byId("memory-entries");
-  entries.replaceChildren();
+  const draft = document.createDocumentFragment();
   memoryDraft.forEach((entry, index) => {
     const label = node("label", `${labels.memory} ${index + 1}`);
     const input = node("textarea");
@@ -801,8 +878,9 @@ function renderMemoryDraft() {
       memoryDraft = memoryDraft.filter(item => item !== entry);
       renderMemoryDraft();
     });
-    entries.append(label, remove);
+    draft.append(label, remove);
   });
+  entries.replaceChildren(draft);
   byId("add-memory").disabled = memoryDraft.length >= 40;
 }
 byId("add-memory").addEventListener("click", () => {
@@ -823,7 +901,9 @@ byId("settings").addEventListener("click", () => {
   renderMemoryDraft();
   byId("custom-color").hidden = state.accent !== "custom";
   preferences.returnValue = "";
+  document.documentElement.setAttribute("data-settings-open", "");
   preferences.showModal();
+  previewObserver.observe(settingsOrb);
 });
 byId("remove-avatar").addEventListener("click", () => {
   avatarDraft = "";
@@ -834,31 +914,37 @@ byId("accent").addEventListener("change", event => {
 });
 byId("clear-memory").addEventListener("click", () => { byId("memory").value = ""; });
 function previewVisual() {
-  const values = { ...state };
-  for (const key of Object.keys(visualDefaults)) {
-    const id = settingIds[key] ?? ranges[key];
-    if (id) values[key] = ranges[key] ? Number(byId(id).value) : byId(id).value;
-  }
-  values.motionEnabled = byId("motion-enabled").checked;
-  values.ambience = byId("ambience").checked;
-  return values;
+  return Object.fromEntries(Array.from(appearanceControls, ([control, key]) => [
+    key, control.type === "checkbox" ? control.checked : control.type === "range" ? control.valueAsNumber : control.value,
+  ]));
 }
+
+function queueVisualPreview() {
+  if (previewFrame) return;
+  previewFrame = requestAnimationFrame(() => {
+    previewFrame = 0;
+    if (preferences.open) applyVisual(previewVisual());
+  });
+}
+
 preferences.addEventListener("input", event => {
-  const controls = [...Object.keys(visualDefaults).map(key => settingIds[key] ?? ranges[key]), "motion-enabled", "ambience"];
-  if (controls.includes(event.target.id)) appearance(previewVisual());
+  if (appearanceControls.has(event.target)) queueVisualPreview();
 });
 byId("reset-visual").addEventListener("click", () => {
-  for (const [key, value] of Object.entries(visualDefaults)) {
-    const id = settingIds[key] ?? ranges[key];
-    if (id) byId(id).value = value;
+  for (const [control, key] of appearanceControls) {
+    if (control.type === "checkbox") control.checked = visualDefaults[key];
+    else control.value = visualDefaults[key];
   }
-  byId("motion-enabled").checked = visualDefaults.motionEnabled;
-  byId("ambience").checked = visualDefaults.ambience;
   byId("custom-color").hidden = true;
-  appearance(previewVisual());
+  queueVisualPreview();
 });
 preferences.addEventListener("close", async () => {
-  appearance();
+  if (previewFrame) cancelAnimationFrame(previewFrame);
+  previewFrame = 0;
+  previewObserver.unobserve(settingsOrb);
+  settingsOrb.removeAttribute("data-visible");
+  document.documentElement.removeAttribute("data-settings-open");
+  if (preferences.returnValue !== "save") appearance();
   if (preferences.returnValue === "deleteAccount") {
     byId("removal-status").textContent = "";
     byId("account-removal").showModal();
@@ -873,20 +959,20 @@ preferences.addEventListener("close", async () => {
   const session = vault;
   const values = Object.fromEntries(Object.entries(settingIds).map(([key, id]) => [key, byId(id).value.trim()]));
   const memoryEnabled = byId("memory-enabled").checked;
-  const visual = previewVisual();
-  const visualValues = Object.fromEntries(Object.keys(visualDefaults).map(key => [key, visual[key]]));
+  const visualValues = previewVisual();
   const memories = memoryDraft.filter(entry => entry.content.trim()).map(entry => ({ ...entry, content: entry.content.trim() }));
   let avatar = avatarDraft ?? "";
   if (selected) {
     try { avatar = await avatarImage(selected); }
-    catch { report("invalidAvatar"); return; }
+    catch { appearance(); report("invalidAvatar"); return; }
     finally { byId("avatar-file").value = ""; }
   }
   if (vault !== session) return;
+  const nameChanged = state.aiName !== values.aiName;
   state = { ...state, ...values, ...visualValues, memoryEnabled, avatar, memories };
   refreshIdentity();
   appearance();
-  renderMessages();
+  if (nameChanged) renderMessages();
   report("saved");
   persist();
 });
@@ -896,9 +982,9 @@ confirmDelete.addEventListener("close", () => {
   if (state.active === deleting) openChat(null);
   else {
     renderHistory();
-    persist();
     byId("new").focus();
   }
+  persist();
 });
 
 document.querySelectorAll("[data-prompt]").forEach(button => {
@@ -1040,12 +1126,21 @@ voiceRoom.addEventListener("close", () => {
   stopSpeech();
 });
 
+const nativePromptSize = CSS.supports("field-sizing", "content");
+let promptFitFrame;
 function fitPrompt() {
-  prompt.style.height = "auto";
-  prompt.style.height = `${Math.min(170, Math.max(56, prompt.scrollHeight))}px`;
+  if (nativePromptSize || promptFitFrame) return;
+  promptFitFrame = requestAnimationFrame(() => {
+    promptFitFrame = undefined;
+    prompt.style.height = "0px";
+    prompt.style.height = `${Math.min(170, Math.max(56, prompt.scrollHeight))}px`;
+  });
 }
 
-prompt.addEventListener("input", () => { fitPrompt(); updateControls(); });
+prompt.addEventListener("input", () => {
+  fitPrompt();
+  send.disabled = !prompt.value.trim() || loadingFiles;
+});
 prompt.addEventListener("keydown", event => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing && window.matchMedia("(pointer: fine)").matches) {
     event.preventDefault();
@@ -1080,6 +1175,7 @@ byId("composer").addEventListener("submit", event => {
 async function submitChat(content, replaceFrom = -1, regenerate = false) {
   if (!content || pending || loadingFiles || syncing) return;
   cancelCapture?.();
+  stopSpeech();
   const controller = new AbortController();
   pending = controller;
   const attachments = replaceFrom < 0 ? files : [];
@@ -1138,11 +1234,10 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
       partial = text;
       if (!paint) paint = requestAnimationFrame(() => {
         paint = 0;
-        const follow = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 95;
         draft.lastElementChild.textContent = partial;
-        if (follow) scrollToLatest();
+        if (atBottom) scrollToLatest();
       });
-    });
+    }, response.headers.get("x-khat-stream-filtered") === "1");
     answer = { role: "assistant", content: reply, sources, model, language: state.language };
     chat.messages.push(answer);
     const learned = decodeURIComponent(response.headers.get("x-khat-memory") ?? "");
@@ -1173,7 +1268,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
     motionState({ thinking: false, responding: false });
     if (!temporary) persist();
     renderHistory();
-    renderMessages();
+    renderMessages(atBottom);
     renderFiles();
     updateControls();
     fitPrompt();
@@ -1184,7 +1279,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
 }
 
 const studio = setupStudio({ state: () => state, labels: () => labels, persist, report, vault: () => vault, onUsage: refreshUsage });
-setupAdmin(() => labels);
+setupAdmin(() => labels, refreshUsage);
 mountGlass();
 motionState({});
 renderLanguage();

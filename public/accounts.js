@@ -15,7 +15,7 @@ export async function api(path, data, accountId = scope) {
   return result;
 }
 
-export function accountVault(account, initial, images) {
+export function accountVault(account, initial) {
   const request = (path, data) => api(path, data, account.id);
   let revision = initial.revision;
   let queue = Promise.resolve();
@@ -28,7 +28,7 @@ export function accountVault(account, initial, images) {
   return {
     account,
     name: account.username,
-    data: { ...initial.preferences, chats: initial.chats, memories: initial.memories, images },
+    data: { ...initial.preferences, chats: initial.chats, memories: initial.memories, images: [] },
     async reload() {
       await queue;
       const version = changes;
@@ -54,13 +54,14 @@ export function accountVault(account, initial, images) {
       return queue;
     },
     flush: () => queue,
+    loadImages: () => request("/api/studio-history"),
     saveImage: item => request("/api/studio-history", item),
     removeImage: id => request("/api/studio-history", { id, remove: true }),
     release: () => request("/api/logout", {}),
   };
 }
 
-export function setupAdmin(labels) {
+export function setupAdmin(labels, onQuotaChanged) {
   const dialog = document.getElementById("admin");
   const list = document.getElementById("admin-users");
   const status = document.getElementById("admin-status");
@@ -86,7 +87,7 @@ export function setupAdmin(labels) {
       const title = node("strong", user.username);
       const details = node("span", `${l.textLimit}: ${counts.text} · ${l.imageLimit}: ${counts.image}`);
       row.append(title, details);
-      if (user.role === "member") {
+      if (user.role === "member" || user.id === scope) {
         const enabled = node("input");
         enabled.type = "checkbox";
         enabled.checked = user.active === 1;
@@ -102,13 +103,15 @@ export function setupAdmin(labels) {
         const text = limit(user.text_limit, 35);
         const image = limit(user.image_limit, 8);
         const save = node("button", l.save, "primary");
-        row.append(label(l.accountActive, enabled), label(l.textLimit, text), label(l.imageLimit, image), save);
+        if (user.role === "member") row.append(label(l.accountActive, enabled));
+        row.append(label(l.textLimit, text), label(l.imageLimit, image), save);
         row.addEventListener("submit", async event => {
           event.preventDefault();
           save.disabled = true;
           try {
             await api("/api/admin/user", { id: user.id, active: enabled.checked, textLimit: +text.value, imageLimit: +image.value });
             status.textContent = l.saved;
+            onQuotaChanged();
           } catch (err) {
             error(err);
           } finally {

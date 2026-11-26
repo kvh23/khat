@@ -2,7 +2,7 @@
 
 Khat is a bilingual AI workspace for chat and image generation. It uses the existing Cloudflare Worker and Workers AI binding. The interface follows the system theme by default and supports a custom accent, reduced motion, and English or Danish.
 
-[3.0 implementation notes, model evaluation, screenshots, and motion demo](docs/liquid-intelligence.md)
+[3.0 implementation notes, model evaluation, screenshots, and motion demo](docs/liquid-intelligence.md) · [Refinement profile and quota behavior](docs/refinement.md)
 
 ## Review and test
 
