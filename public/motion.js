@@ -7,14 +7,15 @@ let meter;
 let settle;
 let pulse;
 
-export function motionPreferences(state) {
+export function motionPreferences(state, previous) {
   intensity = state.motionIntensity / 100;
   enabled = state.motionEnabled !== false && state.motionIntensity !== 0;
-  root.dataset.motion = enabled ? "on" : "off";
-  root.dataset.orbStyle = state.orbStyle;
-  root.style.setProperty("--orb-one", state.orbOne);
-  root.style.setProperty("--orb-two", state.orbTwo);
-  root.style.setProperty("--intensity", intensity);
+  const motion = enabled ? "on" : "off";
+  if (root.dataset.motion !== motion) root.dataset.motion = motion;
+  if (state.orbStyle !== previous?.orbStyle) root.dataset.orbStyle = state.orbStyle;
+  if (state.orbOne !== previous?.orbOne) root.style.setProperty("--orb-one", state.orbOne);
+  if (state.orbTwo !== previous?.orbTwo) root.style.setProperty("--orb-two", state.orbTwo);
+  if (state.motionIntensity !== previous?.motionIntensity) root.style.setProperty("--intensity", intensity);
   if ((!enabled || systemReduced.matches) && meter) endMeter();
 }
 

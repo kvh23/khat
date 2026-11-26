@@ -207,7 +207,6 @@ aside { padding-inline: 18px; }
 .mark i:nth-child(3) { height: 30%; left: 53%; top: 46%; transform: rotate(-45deg); }
 .hero-mark { animation: logo-arrive 650ms cubic-bezier(.2,.8,.25,1) both; border: 1px solid color-mix(in srgb, var(--accent), var(--on-accent) 16%); }
 @keyframes logo-arrive { from { opacity: .5; transform: translateY(9px) rotate(-12deg) scale(.9); } to { opacity: 1; transform: translateY(0) rotate(0) scale(1); } }
-.top, #composer { background: color-mix(in srgb, var(--panel) 86%, transparent); backdrop-filter: blur(18px) saturate(130%); }
 .top { min-height: 66px; }
 .top #collapse { color: var(--muted); font-size: .8rem; margin-right: .35rem; }
 .welcome h1 { max-width: 820px; font-family: Georgia, "New York", serif; font-weight: 400; letter-spacing: -.07em; font-size: clamp(2.75rem, 6.3vw, 5.8rem); }
