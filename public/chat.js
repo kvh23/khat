@@ -2,7 +2,9 @@ import { translations } from "./i18n.js";
 import { markdown, node, webUrl } from "./markdown.js";
 import { readReply } from "./stream.js";
 import { canImportLegacy, createProfile, profiles, unlock } from "./vault.js";
-import { setupStudio } from "./studio.js";
+import { crop, setupStudio } from "./studio.js";
+import { accountHeaders, accountVault, api, avatarImage, setAccountScope, setupAdmin } from "./accounts.js";
+import { animate, endMeter, motionPreferences, motionState, startMeter } from "./motion.js";
 
 const byId = id => document.getElementById(id);
 const prompt = byId("prompt");
@@ -21,6 +23,8 @@ const defaults = () => ({
   personality: "", memory: "", memoryEnabled: false, aiName: "", instructions: "",
   length: "balanced", style: "balanced", theme: "auto", accent: "ink", customAccent: "#526c83",
   mode: "auto", collapsed: false, chats: [], active: null, images: [],
+  displayName: "", avatar: "", memories: [], orbOne: "#7db9a7", orbTwo: "#847ed5",
+  orbStyle: "fluid", motionEnabled: true, motionIntensity: 65,
 });
 const shell = document.querySelector(".shell");
 const profileDialog = byId("profiles");
@@ -32,11 +36,18 @@ const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
 const settingIds = {
   theme: "theme", accent: "accent", customAccent: "custom-accent", aiName: "ai-name", length: "response-length",
   style: "response-style", personality: "personality", instructions: "instructions", memory: "memory",
+  displayName: "display-name", orbStyle: "orb-style", orbOne: "orb-one", orbTwo: "orb-two",
 };
 const modelNames = { instant: "Khat Instant", think: "Khat Think", pro: "Khat Pro", legacy: "Llama 3.3 70B" };
 let state = defaults();
 let labels = translations[state.language];
 let vault;
+let accountsMode = false;
+let registering = false;
+let temporary;
+let avatarDraft;
+let memoryDraft;
+let syncing = false;
 let archives = false;
 let optionsId;
 let editing;
@@ -59,13 +70,14 @@ async function persist() {
   try {
     await vault.save(state);
     return true;
-  } catch {
-    report("storageFailed");
+  } catch (error) {
+    report(labels[error.message] ? error.message : "storageFailed");
     return false;
   }
 }
 
 function appearance() {
+  motionPreferences(state);
   const root = document.documentElement;
   root.dataset.theme = state.theme;
   root.dataset.effectiveTheme = state.theme === "auto" ? (systemDark.matches ? "dark" : "light") : state.theme;
@@ -103,11 +115,25 @@ async function showProfiles(showCreate = false) {
   }
 }
 
+function refreshIdentity() {
+  byId("profile-name").textContent = state.displayName || vault?.name || "";
+  const avatar = byId("account-avatar");
+  avatar.hidden = !state.avatar;
+  if (state.avatar) avatar.src = state.avatar;
+  else avatar.removeAttribute("src");
+}
+
 function enterProfile(session) {
   vault = session;
   state = { ...defaults(), ...session.data };
   if (!Object.hasOwn(translations, state.language)) state.language = deviceLanguage;
-  byId("profile-name").textContent = session.name;
+  temporary = undefined;
+  refreshIdentity();
+  byId("account-preferences").hidden = byId("account-memories").hidden = !session.account;
+  byId("local-memory").hidden = Boolean(session.account);
+  byId("temporary").hidden = !session.account;
+  byId("temporary").setAttribute("aria-pressed", "false");
+  byId("admin-open").hidden = session.account?.role !== "admin";
   byId("mode").value = state.mode;
   byId("history-search").value = "";
   byId("archives").setAttribute("aria-pressed", "false");
@@ -116,6 +142,7 @@ function enterProfile(session) {
   report();
   shell.hidden = false;
   profileDialog.close();
+  byId("account-auth").close();
   renderLanguage();
   updateControls();
 }
@@ -157,30 +184,238 @@ byId("profile-language").addEventListener("click", () => {
   renderLanguage();
   showProfiles(!createForm.hidden && unlockForm.hidden);
 });
+async function resetSession() {
+  recording?.abort();
+  endMeter();
+  stopSpeech();
+  vault = undefined;
+  setAccountScope(null);
+  temporary = undefined;
+  avatarDraft = undefined;
+  memoryDraft = undefined;
+  state = { ...defaults(), language: state.language };
+  prompt.value = "";
+  files = [];
+  for (const id of [...Object.values(settingIds), "edit-text", "conversation-name", "import-password", "removal-password"]) byId(id).value = "";
+  byId("memory-entries").replaceChildren();
+  byId("profile-name").textContent = "";
+  refreshIdentity();
+  renderLanguage();
+  if (accountsMode) showAccount();
+  else await showProfiles();
+}
+
 byId("lock").addEventListener("click", async () => {
   if (!vault || pending || byId("lock").disabled) return;
   byId("lock").disabled = true;
   try {
-    await vault.flush();
-  } catch {
-    report("storageFailed");
-    return;
+    await vault.flush().catch(() => {});
+    await vault.release();
+    await resetSession();
+  } catch (error) {
+    if (["signInRequired", "sessionChanged"].includes(error.message)) await resetSession();
+    else report(labels[error.message] ? error.message : "unavailable");
   } finally {
     byId("lock").disabled = false;
   }
-  recording?.abort();
-  stopSpeech();
-  vault.release();
-  vault = undefined;
-  state = { ...defaults(), language: state.language };
-  prompt.value = "";
-  files = [];
+});
+
+function showAccount() {
+  shell.hidden = true;
+  const dialog = byId("account-auth");
+  if (!dialog.open) dialog.showModal();
+}
+
+function accountForm() {
+  byId("account-title").textContent = labels[registering ? "registerTitle" : "accountWelcome"];
+  byId("account-submit").textContent = labels[registering ? "createAccount" : "signIn"];
+  byId("account-toggle").textContent = labels[registering ? "signIn" : "register"];
+  byId("account-password").autocomplete = registering ? "new-password" : "current-password";
+  byId("invitation-field").hidden = !registering;
+  byId("invite").required = registering;
+}
+
+async function openAccount(account) {
+  setAccountScope(account);
+  const workspace = await api("/api/workspace");
+  const { images } = await api("/api/studio-history");
+  enterProfile(accountVault(account, workspace, images));
+}
+
+async function initialize() {
+  try {
+    const result = await fetch("/api/session");
+    if (result.status === 404) {
+      await showProfiles();
+      return;
+    }
+    accountsMode = true;
+    if (!result.ok) throw new Error("unavailable");
+    const { account } = await result.json();
+    if (account) await openAccount(account);
+    else showAccount();
+  } catch {
+    accountsMode = true;
+    showAccount();
+    byId("account-status").textContent = labels.unavailable;
+  }
+}
+
+byId("account-auth").addEventListener("cancel", event => event.preventDefault());
+byId("account-toggle").addEventListener("click", () => {
+  registering = !registering;
+  accountForm();
+});
+byId("account-language").addEventListener("click", () => {
+  state.language = state.language === "da" ? "en" : "da";
   renderLanguage();
-  await showProfiles();
+});
+byId("account-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const fields = byId("account-status");
+  const submit = byId("account-submit");
+  if (submit.disabled) return;
+  submit.disabled = true;
+  const data = Object.fromEntries(new FormData(form));
+  fields.textContent = labels.opening;
+  try {
+    const { account } = await api(registering ? "/api/register" : "/api/login", data);
+    await openAccount(account);
+    fields.textContent = "";
+    form.reset();
+    registering = false;
+    accountForm();
+  } catch (error) {
+    fields.textContent = labels[error.message] || labels.unavailable;
+  } finally {
+    byId("account-password").value = "";
+    submit.disabled = false;
+  }
+});
+
+async function syncWorkspace() {
+  const session = vault;
+  if (!session?.account || syncing || pending || temporary || prompt.value || document.querySelector("dialog[open]")) return;
+  syncing = true;
+  try {
+    const apply = await session.reload();
+    if (apply && session === vault && !pending && !temporary && !prompt.value && !document.querySelector("dialog[open]")) {
+      const updated = apply();
+      if (!updated) return;
+      state = { ...state, ...updated };
+      byId("mode").value = state.mode;
+      refreshIdentity();
+      renderLanguage();
+    }
+  } catch (error) {
+    if (["signInRequired", "sessionChanged"].includes(error.message) && session === vault) await resetSession();
+  } finally {
+    syncing = false;
+  }
+}
+window.addEventListener("focus", syncWorkspace);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncWorkspace(); });
+setInterval(() => { if (!document.hidden) syncWorkspace(); }, 30_000);
+
+byId("export-account").addEventListener("click", async () => {
+  const session = vault;
+  if (!session?.account) return;
+  try {
+    await session.flush().catch(() => {});
+    const data = await api("/api/export");
+    if (session !== vault) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const link = node("a");
+    link.href = url;
+    link.download = "khat-account.json";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  } catch (error) {
+    report(labels[error.message] || "unavailable");
+  }
+});
+
+byId("removal-cancel").addEventListener("click", () => byId("account-removal").close());
+byId("account-removal").addEventListener("close", () => { byId("removal-password").value = ""; });
+byId("removal-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    await api("/api/delete-account", { password: byId("removal-password").value });
+    byId("account-removal").close();
+    await resetSession();
+  } catch (error) {
+    byId("removal-status").textContent = labels[error.message] || labels.unavailable;
+  } finally {
+    byId("removal-password").value = "";
+    button.disabled = false;
+  }
+});
+
+async function openImport() {
+  const items = await profiles();
+  byId("import-profile").replaceChildren(...items.map(item => {
+    const option = node("option", item.name);
+    option.value = item.id;
+    return option;
+  }));
+  byId("import-status").textContent = items.length ? "" : labels.noLocalProfiles;
+  byId("import-dialog").showModal();
+}
+byId("import-close").addEventListener("click", () => byId("import-dialog").close());
+byId("import-dialog").addEventListener("close", () => { byId("import-password").value = ""; });
+byId("import-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  let local;
+  const session = vault;
+  try {
+    local = await unlock(byId("import-profile").value, byId("import-password").value);
+    if (session !== vault) return;
+    const old = state;
+    const known = new Set(state.chats.map(chat => chat.id));
+    const chats = [...state.chats, ...local.data.chats.filter(chat => !known.has(chat.id))];
+    const memories = [...state.memories];
+    if (local.data.memory && memories.length < 40 && !memories.some(mem => mem.content === local.data.memory)) {
+      memories.push({ id: crypto.randomUUID(), content: local.data.memory.slice(0, 500), source: "manual" });
+    }
+    state = { ...state, chats, memories };
+    if (!await persist()) {
+      if (session === vault) state = old;
+      throw new Error(notice);
+    }
+    let imageError = false;
+    for (const image of (local.data.images ?? []).slice().reverse()) {
+      if (session !== vault) return;
+      if (state.images.length >= 12) { imageError = true; break; }
+      if (state.images.some(current => current.id === image.id)) continue;
+      try {
+        const data = await crop(image.data.split(",")[1], undefined, true);
+        const item = { id: image.id, prompt: image.prompt, data };
+        await session.saveImage(item);
+        if (session !== vault) return;
+        state.images.unshift(item);
+      } catch {
+        imageError = true;
+      }
+    }
+    byId("import-dialog").close();
+    renderHistory();
+    report(imageError ? "importPartial" : "imported");
+  } catch (error) {
+    byId("import-status").textContent = labels[error.message] || labels.unavailable;
+  } finally {
+    local?.release();
+    button.disabled = false;
+    byId("import-password").value = "";
+  }
 });
 
 function current() {
-  return state.chats.find(chat => chat.id === state.active);
+  return temporary ?? state.chats.find(chat => chat.id === state.active);
 }
 
 function closeMenu() {
@@ -362,7 +597,8 @@ function renderMessages() {
 
 function updateControls() {
   byId("activity").hidden = !pending;
-  for (const id of ["mode", "lock", "studio-open"]) byId(id).disabled = Boolean(pending);
+  timeline.setAttribute("aria-busy", String(Boolean(pending)));
+  for (const id of ["mode", "lock", "studio-open", "temporary", "admin-open"]) byId(id).disabled = Boolean(pending);
   send.disabled = !prompt.value.trim() || loadingFiles;
   send.hidden = Boolean(pending);
   stop.hidden = !pending;
@@ -380,12 +616,14 @@ function renderLanguage() {
   document.querySelectorAll("[data-label]").forEach(element => {
     element.textContent = labels[element.dataset.label];
   });
-  for (const id of ["language", "profile-language"]) {
+  for (const id of ["language", "profile-language", "account-language"]) {
     const language = byId(id);
     language.textContent = state.language === "da" ? "EN" : "DA";
     language.setAttribute("aria-label", labels.switchLanguage);
   }
-  byId("lock").setAttribute("aria-label", labels.lock);
+  byId("lock").setAttribute("aria-label", vault?.account ? labels.signOut : labels.lock);
+  accountForm();
+  if (vault?.account) preferences.querySelector("[data-label=privacy]").textContent = labels.accountPrivacy;
   byId("history-search").placeholder = labels.searchHistory;
   appearance();
   byId("sidebar").setAttribute("aria-label", labels.history);
@@ -403,12 +641,15 @@ function renderLanguage() {
 
 function openChat(id) {
   recording?.abort();
+  temporary = undefined;
+  byId("temporary").setAttribute("aria-pressed", "false");
   state.active = id;
   prompt.value = "";
   files = [];
   renderFiles();
   renderHistory();
   renderMessages();
+  animate(timeline, [{ opacity: .65, transform: "translateY(3px)" }, { opacity: 1, transform: "none" }], 180);
   closeMenu();
   report();
   persist();
@@ -452,6 +693,14 @@ conversationOptions.addEventListener("close", () => {
 editDialog.addEventListener("close", () => {
   if (editDialog.returnValue === "send") submitChat(byId("edit-text").value.trim(), editing);
 });
+byId("temporary").addEventListener("click", () => {
+  const next = !temporary;
+  openChat(null);
+  if (next) temporary = { id: crypto.randomUUID(), title: labels.temporary, messages: [] };
+  byId("temporary").setAttribute("aria-pressed", String(next));
+  renderHistory();
+  report(next ? "temporaryNotice" : "");
+});
 byId("new").addEventListener("click", () => openChat(null));
 byId("menu").addEventListener("click", () => {
   const open = byId("sidebar").classList.toggle("open");
@@ -463,21 +712,81 @@ byId("language").addEventListener("click", () => {
   persist();
   renderLanguage();
 });
+function renderMemoryDraft() {
+  const entries = byId("memory-entries");
+  entries.replaceChildren();
+  memoryDraft.forEach((entry, index) => {
+    const label = node("label", `${labels.memory} ${index + 1}`);
+    const input = node("textarea");
+    input.maxLength = 500;
+    input.rows = 2;
+    input.value = entry.content;
+    input.addEventListener("input", () => { entry.content = input.value; entry.source = "manual"; });
+    label.append(input);
+    const remove = node("button", labels.delete);
+    remove.type = "button";
+    remove.addEventListener("click", () => {
+      memoryDraft = memoryDraft.filter(item => item !== entry);
+      renderMemoryDraft();
+    });
+    entries.append(label, remove);
+  });
+  byId("add-memory").disabled = memoryDraft.length >= 40;
+}
+byId("add-memory").addEventListener("click", () => {
+  if (memoryDraft.length >= 40) return;
+  memoryDraft.push({ id: crypto.randomUUID(), content: "", source: "manual" });
+  renderMemoryDraft();
+  [...byId("memory-entries").querySelectorAll("textarea")].at(-1)?.focus();
+});
 byId("settings").addEventListener("click", () => {
   for (const [key, id] of Object.entries(settingIds)) byId(id).value = state[key];
   byId("memory-enabled").checked = state.memoryEnabled;
+  byId("motion-enabled").checked = state.motionEnabled;
+  byId("motion-intensity").value = state.motionIntensity;
+  avatarDraft = state.avatar;
+  byId("avatar-file").value = "";
+  memoryDraft = state.memories.map(entry => ({ ...entry }));
+  renderMemoryDraft();
   byId("custom-color").hidden = state.accent !== "custom";
   preferences.returnValue = "";
   preferences.showModal();
+});
+byId("remove-avatar").addEventListener("click", () => {
+  avatarDraft = "";
+  byId("avatar-file").value = "";
 });
 byId("accent").addEventListener("change", event => {
   byId("custom-color").hidden = event.currentTarget.value !== "custom";
 });
 byId("clear-memory").addEventListener("click", () => { byId("memory").value = ""; });
-preferences.addEventListener("close", () => {
+preferences.addEventListener("close", async () => {
+  if (preferences.returnValue === "deleteAccount") {
+    byId("removal-status").textContent = "";
+    byId("account-removal").showModal();
+    return;
+  }
+  if (preferences.returnValue === "import") {
+    await openImport().catch(() => report("profileUnavailable"));
+    return;
+  }
   if (preferences.returnValue !== "save") return;
-  for (const [key, id] of Object.entries(settingIds)) state[key] = byId(id).value.trim();
-  state.memoryEnabled = byId("memory-enabled").checked;
+  const selected = byId("avatar-file").files[0];
+  const session = vault;
+  const values = Object.fromEntries(Object.entries(settingIds).map(([key, id]) => [key, byId(id).value.trim()]));
+  const memoryEnabled = byId("memory-enabled").checked;
+  const motionEnabled = byId("motion-enabled").checked;
+  const motionIntensity = Number(byId("motion-intensity").value);
+  const memories = memoryDraft.filter(entry => entry.content.trim()).map(entry => ({ ...entry, content: entry.content.trim() }));
+  let avatar = avatarDraft ?? "";
+  if (selected) {
+    try { avatar = await avatarImage(selected); }
+    catch { report("invalidAvatar"); return; }
+    finally { byId("avatar-file").value = ""; }
+  }
+  if (vault !== session) return;
+  state = { ...state, ...values, memoryEnabled, motionEnabled, motionIntensity, avatar, memories };
+  refreshIdentity();
   appearance();
   renderMessages();
   report("saved");
@@ -546,6 +855,8 @@ byId("voice").addEventListener("click", event => {
   const finish = () => {
     if (recording !== session) return;
     recording = null;
+    motionState({ listening: false });
+    endMeter();
     button.setAttribute("aria-pressed", "false");
     if (notice === "listening") report();
   };
@@ -565,6 +876,8 @@ byId("voice").addEventListener("click", event => {
     session.start();
     button.setAttribute("aria-pressed", "true");
     report("listening");
+    motionState({ listening: true });
+    startMeter();
   } catch {
     finish();
     report("voiceFailed");
@@ -598,7 +911,7 @@ byId("composer").addEventListener("submit", event => {
 });
 
 async function submitChat(content, replaceFrom = -1, regenerate = false) {
-  if (!content || pending || loadingFiles) return;
+  if (!content || pending || loadingFiles || syncing) return;
   recording?.abort();
   const controller = new AbortController();
   pending = controller;
@@ -621,34 +934,50 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
   renderMessages();
   updateControls();
   report("thinking");
+  motionState({ thinking: true });
   const draft = messageElement({ role: "assistant", content: "" }, true);
   messages.append(draft);
   let partial = "";
+  let paint = 0;
   let sources = [];
   let model;
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...accountHeaders() },
       signal: controller.signal,
       body: JSON.stringify({
         messages: modelHistory(chat.messages, 48000 - attachments.reduce((sum, file) => sum + file.text.length, 0)),
         personality: state.personality, memory: state.memoryEnabled ? state.memory : "",
         aiName: state.aiName, instructions: state.instructions, style: state.style, length: state.length,
-        language: state.language, mode: state.mode, files: attachments, search,
+        language: state.language, mode: state.mode, files: attachments, search, temporary: Boolean(temporary),
       }),
     });
     if (!response.ok) throw new Error((await response.json()).error ?? "modelFailed");
     if (!response.body) throw new Error("modelFailed");
     model = response.headers.get("x-khat-model");
     sources = JSON.parse(decodeURIComponent(response.headers.get("x-khat-sources") ?? "%5B%5D"));
+    let started = false;
     const reply = await readReply(response.body, text => {
-      const follow = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 95;
+      if (!started) {
+        started = true;
+        motionState({ thinking: false, responding: true });
+        animate(draft, [{ opacity: .58 }, { opacity: 1 }], 200);
+      }
       partial = text;
-      draft.lastElementChild.textContent = text;
-      if (follow) scrollToLatest();
+      if (!paint) paint = requestAnimationFrame(() => {
+        paint = 0;
+        const follow = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 95;
+        draft.lastElementChild.textContent = partial;
+        if (follow) scrollToLatest();
+      });
     });
     chat.messages.push({ role: "assistant", content: reply, sources, model, language: state.language });
+    const learned = decodeURIComponent(response.headers.get("x-khat-memory") ?? "");
+    if (vault?.account && !temporary && state.memoryEnabled && learned && state.memories.length < 40 &&
+      !state.memories.some(entry => entry.content === learned)) {
+      state.memories.push({ id: crypto.randomUUID(), content: learned, source: "explicit" });
+    }
     report(response.headers.get("x-khat-fallback") === "true" ? "fallback" : "");
   } catch (error) {
     if (controller.signal.aborted && partial.trim()) {
@@ -666,8 +995,10 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
     }
     report(controller.signal.aborted ? "stopped" : Object.hasOwn(labels, error.message) ? error.message : "modelFailed");
   } finally {
+    if (paint) cancelAnimationFrame(paint);
     pending = null;
-    persist();
+    motionState({ thinking: false, responding: false });
+    if (!temporary) persist();
     renderHistory();
     renderMessages();
     renderFiles();
@@ -676,7 +1007,8 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
   }
 }
 
-setupStudio({ state: () => state, labels: () => labels, persist, report });
+setupStudio({ state: () => state, labels: () => labels, persist, report, vault: () => vault });
+setupAdmin(() => labels);
 renderLanguage();
 updateControls();
-showProfiles();
+initialize();

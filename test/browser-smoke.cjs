@@ -79,8 +79,8 @@ const assert = require('node:assert/strict');
       await heading('Your space, kept private.').waitFor();
     };
     const unlock = async (name, secret = password + name) => {
-      await page.getByLabel('Profile', { exact: true }).selectOption({ label: name });
-      await page.getByLabel('Passphrase', { exact: true }).fill(secret);
+      await page.locator('#profiles').getByLabel('Profile', { exact: true }).selectOption({ label: name });
+      await page.locator('#profiles').getByLabel('Passphrase', { exact: true }).fill(secret);
       await button('Unlock').click();
     };
 
@@ -90,7 +90,7 @@ const assert = require('node:assert/strict');
     assert.equal(await page.evaluate(() => localStorage.getItem('khat.workspace.v1')), null);
     await button('Old private chat').waitFor();
     await button('Hide sidebar').click();
-    assert.equal(await page.locator('#sidebar').isVisible(), false);
+    await page.locator('#sidebar').waitFor({ state: 'hidden' });
     await button('Show sidebar').click();
     await button('Settings').click();
     const settings = page.locator('#preferences');

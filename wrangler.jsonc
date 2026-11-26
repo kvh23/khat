@@ -5,13 +5,26 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "khat",
+	"vars": { "ACCOUNTS_REQUIRED": "true" },
+	"d1_databases": [{
+		"binding": "DB",
+		"database_name": "khat-accounts",
+		"database_id": "c746c800-3a9f-4cbe-af5d-315bb8363a65",
+		"migrations_dir": "migrations"
+	}],
 	"main": "src/index.ts",
 	"compatibility_date": "2025-10-08",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 	"durable_objects": {
-		"bindings": [{ "name": "USAGE", "class_name": "UsageGate" }]
+		"bindings": [
+			{ "name": "USAGE", "class_name": "UsageGate" },
+			{ "name": "PASSWORDS", "class_name": "PasswordHasher" }
+		]
 	},
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["UsageGate"] }],
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["UsageGate"] },
+		{ "tag": "v2", "new_sqlite_classes": ["PasswordHasher"] }
+	],
 	"ratelimits": [
 		{ "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
 		{ "name": "CHAT_LIMIT", "namespace_id": "1002", "simple": { "limit": 18, "period": 60 } }

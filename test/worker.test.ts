@@ -210,3 +210,36 @@ describe("Studio", () => {
 		expect((await call(invalid)).status).toBe(502);
 	});
 });
+
+describe("account memory and temporary chat", () => {
+	it("uses only relevant opted-in memories and skips D1 memory reads in temporary chat", async () => {
+		const f = fixture();
+		const prepare = vi.fn((sql: string) => ({
+			bind: () => ({
+				first: async () => sql.includes("JOIN accounts") ? { id: "account-fixture" } : { preferences: '{"memoryEnabled":true}' },
+				all: async () => ({ results: [{ content: "I am learning about mountain photography." }, { content: "I enjoy baking." }] }),
+			}),
+		}));
+		Object.assign(f.env, { DB: { prepare }, PASSWORDS: {} });
+		const headers = { cookie: `__Host-khat_session=${"X".repeat(43)}`, "x-khat-account": "account-fixture" };
+		const payload = { messages: [{ role: "user", content: "Explain mountain photography" }], memory: "spoofed client memory" };
+		const normal = await f.post(payload, headers);
+		expect(normal.status).toBe(200);
+		expect(JSON.stringify(f.run.mock.calls.at(-1))).toContain("learning about mountain photography");
+		expect(JSON.stringify(f.run.mock.calls.at(-1))).not.toContain("baking");
+		expect(JSON.stringify(f.run.mock.calls.at(-1))).not.toContain("spoofed");
+		prepare.mockClear();
+		const temporary = await f.post({ ...payload, temporary: true }, headers);
+		expect(temporary.headers.get("x-khat-memory")).toBe("");
+		expect(prepare.mock.calls.some(([sql]) => /memories|preferences/.test(sql))).toBe(false);
+		expect(JSON.stringify(f.run.mock.calls.at(-1))).not.toContain("learning about mountain photography");
+	});
+
+	it("only emits canonical opt-in memory suggestions for approved explicit preferences", async () => {
+		const { requestedMemory } = await import("../src/workspace");
+		expect(requestedMemory("Please remember that I prefer concise replies.")).toBe("I prefer concise answers.");
+		expect(requestedMemory("Husk at jeg foretrækker korte svar.")).toBe("Jeg foretrækker korte svar.");
+		expect(requestedMemory("Remember my phone number is 123456789")).toBe("");
+		expect(requestedMemory("Remember that I prefer concise replies and my address is private")).toBe("");
+	});
+});
