@@ -214,3 +214,16 @@ Object.assign(translations.da, {
   modeThink: "Mere ræsonnering til detaljerede opgaver",
   modePro: "Til kompleks skrivning og analyse",
 });
+
+Object.assign(translations.en, {
+  remaining: "Remaining",
+  onboardingName: "What should Khat call you?",
+  onboardingHelp: "A nickname or preferred name is fine. You can change it in Settings.",
+  displayNameInvalid: "Enter a display name of up to 40 characters.",
+});
+Object.assign(translations.da, {
+  remaining: "Tilbage",
+  onboardingName: "Hvad skal Khat kalde dig?",
+  onboardingHelp: "Brug gerne et kaldenavn. Du kan ændre det i Indstillinger.",
+  displayNameInvalid: "Skriv et visningsnavn på højst 40 tegn.",
+});

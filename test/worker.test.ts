@@ -83,6 +83,21 @@ describe("Worker authentication and routing", () => {
 });
 
 describe("chat and sources", () => {
+	it.each([
+		["Hvem er du?", "thinkClassic"], ["Hvad hedder du?", "thinkClassic"], ["Hvad hedder jeg?", "thinkClassic"],
+		["Forklar fotosyntese på dansk.", "thinkClassic"], ["Skriv en kort professionel e-mail.", "thinkClassic"],
+		["Forklar forskellen på lineære og eksponentielle funktioner.", "thinkClassic"],
+		["Beregn 12 * 17", "think"], ["Fejlfind min JavaScript-funktion", "think"],
+		["Sammenlign mulige forklaringer og analysér antagelserne", "think"],
+	])("routes Danish input %s and supplies language guidance", async (content, model) => {
+		const f = fixture();
+		const response = await f.post({ messages: [{ role: "user", content }], mode: "auto", language: "da" });
+		expect(response.headers.get("x-khat-model")).toBe(model);
+		const input = f.run.mock.calls[0]?.[1] as { messages: { role: string; content: string }[] };
+		expect(input.messages[0].content).toContain("Default response language: Danish");
+		expect(input.messages.at(-1)?.content).toBe(content);
+	});
+
 	it("passes personality, memory and file text under the server prompt and streams the requested model", async () => {
 		const { post, run } = fixture();
 		const response = await post({
@@ -286,7 +301,7 @@ it("reports only a fixed registration stage when password derivation fails", asy
 			}) },
 		} as unknown as Env;
 		const response = await accountRoute("/api/register", new Request("https://khat.example/api/register"), {
-			username: "private_user", password: "private test passphrase", invite: "I".repeat(43),
+			username: "private_user", displayName: "Fixture", password: "private test passphrase", invite: "I".repeat(43),
 		}, env, null);
 		expect(response.status).toBe(503);
 		expect(await response.json()).toEqual({ error: "unavailable", stage: "password_hash" });

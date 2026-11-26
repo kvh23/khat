@@ -40,7 +40,7 @@ function inline(parent, text, sources = []) {
         cite.rel = "noopener noreferrer";
         cite.title = source.title;
         parent.append(cite);
-      } else parent.append(raw);
+      }
     } else {
       parent.append(bold ? node("strong", bold) : node("em", italic));
     }

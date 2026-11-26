@@ -74,6 +74,8 @@ export async function accountRoute(path: string, request: Request, input: Record
 	if (path === "/api/login" || path === "/api/register") {
 		const username = name(input.username);
 		if (!username || !validPassword(input.password)) return fail(400, "accountInvalid");
+		const displayName = typeof input.displayName === "string" ? input.displayName.trim() : "";
+		if (path === "/api/register" && (!displayName || displayName.length > 40 || /[\p{Cc}]/u.test(displayName))) return fail(400, "displayNameInvalid");
 		let stage = "rate_limit";
 		try {
 			const ip = request.headers.get("CF-Connecting-IP") ?? "local";
@@ -100,12 +102,13 @@ export async function accountRoute(path: string, request: Request, input: Record
 			const time = now();
 			stage = "account_write";
 			const result = await db.batch([
-				db.prepare(`INSERT OR IGNORE INTO accounts(id,username,salt,password_hash,role)
-					SELECT ?,?,?,?,role FROM invitations WHERE digest=? AND expires>? AND redeemed_at IS NULL`)
+				db.prepare(`INSERT OR IGNORE INTO accounts(id,username,salt,password_hash,role,text_limit,image_limit)
+					SELECT ?,?,?,?,role,24,5 FROM invitations WHERE digest=? AND expires>? AND redeemed_at IS NULL`)
 					.bind(id, username, salt, hash, invitation, time),
 				db.prepare(`UPDATE invitations SET redeemed_at=? WHERE digest=? AND EXISTS(SELECT 1 FROM accounts WHERE id=?)`)
 					.bind(time, invitation, id),
-				db.prepare("INSERT INTO workspaces(owner) SELECT id FROM accounts WHERE id=?").bind(id),
+				db.prepare("INSERT INTO workspaces(owner,preferences) SELECT id,? FROM accounts WHERE id=?")
+					.bind(JSON.stringify({ displayName }), id),
 			]);
 			if (!result[0].meta.changes) return fail(400, "inviteInvalid");
 			stage = "account_lookup";

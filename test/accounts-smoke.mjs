@@ -52,7 +52,7 @@ try {
   assert.equal((await call("/api/session", { noGate: true, status: 401 })).body.error, "unauthorized");
   assert.deepEqual((await call("/api/session")).body, { account: null });
   assert.equal((await call("/api/chat", { data: {}, status: 401 })).body.error, "signInRequired");
-  const admin = await signed("/api/register", { username: "administrator", password, invite });
+  const admin = await signed("/api/register", { username: "administrator", displayName: "Admin", password, invite });
   await call("/api/admin/user", { actor: admin, data: {
     id: admin.account.id, active: false, textLimit: 24, imageLimit: 5,
   }, status: 204 });
@@ -63,7 +63,7 @@ try {
   assert.equal(admin.account.role, "admin");
   const issued = (await call("/api/admin/invite", { actor: admin, data: {} })).body.invite;
 
-  const register = { username: "mountain", password, invite: issued };
+  const register = { username: "mountain", displayName: "Alex", password, invite: issued };
   const results = await Promise.all([
     signed("/api/register", register).catch(error => error),
     signed("/api/register", { ...register, username: "forest" }).catch(error => error),
@@ -75,6 +75,7 @@ try {
   const device = await signed("/api/login", { username: member.account.username, password });
   const read = actor => call("/api/workspace", { actor }).then(result => result.body);
   const initial = await read(member);
+  assert.equal(initial.preferences.displayName, "Alex");
   const workspace = {
     revision: initial.revision,
     preferences: { displayName: "Test name", motionEnabled: false, memoryEnabled: true, orbStyle: "aurora" },
@@ -179,7 +180,11 @@ try {
     await page.getByLabel("Username", { exact: true }).fill(admin.account.username);
     await page.locator("#account-auth").getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page.getByRole("heading", { name: "What’s on your mind?" }).waitFor();
+    await page.locator("#welcome h1").waitFor();
+    await page.locator("#name-onboarding").getByLabel("Display name", { exact: true }).fill("Alex");
+    await page.locator("#name-onboarding").getByRole("button", { name: "Save", exact: true }).click();
+    await page.locator("#name-onboarding").waitFor({ state: "hidden" });
+    assert.equal((await read(admin)).preferences.displayName, "Alex");
     assert.equal(browserGalleryReads, 0);
     const expected = [];
     const checks = [];
@@ -209,7 +214,7 @@ try {
       return canvas.toDataURL("image/jpeg").split(",")[1];
     });
     await button("Settings").click();
-    await label("Display name").fill("Khat friend");
+    await page.locator("#preferences").getByLabel("Display name", { exact: true }).fill("Khat friend");
     await label("Custom instructions").fill("Mit navn er tjek.");
     await label("Profile picture").setInputFiles({
       name: "avatar.jpg", mimeType: "image/jpeg", buffer: Buffer.from(image, "base64"),
@@ -322,10 +327,11 @@ try {
     const newInvite = (await call("/api/admin/invite", { actor: admin, data: {} })).body.invite;
     await button("Use an invitation").click();
     await label("Username").fill("new_browser_member");
+    await page.locator("#registration-name").fill("Alex");
     await page.locator("#account-auth").getByLabel("Password", { exact: true }).fill(password);
     await page.locator("#account-auth").getByLabel("Invitation code", { exact: true }).fill(newInvite);
     await button("Create account").click();
-    await page.getByRole("heading", { name: "What’s on your mind?" }).waitFor();
+    await page.locator("#welcome h1").waitFor();
     assert.equal(await button("Administration").isVisible(), false);
     assert.equal(await page.locator("html").getAttribute("data-orb-style"), "fluid");
     console.log("Account Chromium smoke passed: login, saved motion preferences, reduced motion, temporary chat, memory, admin and logout.");
