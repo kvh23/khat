@@ -5,12 +5,13 @@ const text = (value: unknown, max: number): value is string => typeof value === 
 const isObject = (value: unknown): value is RecordValue => !!value && typeof value === "object" && !Array.isArray(value);
 const memoryKinds = ["manual", "explicit"];
 const options: Record<string, string[]> = {
-	language: ["en", "da"], theme: ["auto", "light", "dark"], style: ["balanced", "direct", "warm", "formal"],
+	language: ["en", "da"], theme: ["auto", "light", "dark"], style: ["balanced", "direct", "warm", "formal", "professional", "creative", "mentor", "technical", "concise", "educational", "friendly"],
 	length: ["brief", "balanced", "detailed"], accent: ["ink", "blue", "green", "rose", "custom"],
-	mode: ["auto", "instant", "think", "pro"], orbStyle: ["minimal", "fluid", "aurora", "classic"],
+	mode: ["auto", "instant", "think", "pro"], orbStyle: ["minimal", "fluid", "aurora", "classic", "intelligence"],
+	density: ["comfortable", "compact"], rail: ["glass", "solid"],
 };
 const stringLimits: Record<string, number> = { aiName: 40, displayName: 40, personality: 1000, instructions: 2000 };
-const bools = ["collapsed", "memoryEnabled", "motionEnabled"];
+const bools = ["collapsed", "memoryEnabled", "motionEnabled", "ambience"];
 
 function sanitizePreferences(value: unknown) {
 	if (!isObject(value)) return null;
@@ -23,8 +24,11 @@ function sanitizePreferences(value: unknown) {
 	for (const key of ["customAccent", "orbOne", "orbTwo"]) {
 		if (typeof value[key] === "string" && /^#[0-9a-f]{6}$/i.test(value[key])) result[key] = value[key];
 	}
-	if (typeof value.motionIntensity === "number" && Number.isInteger(value.motionIntensity) && value.motionIntensity >= 0 && value.motionIntensity <= 100) {
-		result.motionIntensity = value.motionIntensity;
+	const ranges = { motionIntensity: [0, 100], glassOpacity: [65, 100], glassBlur: [0, 24],
+		orbGlow: [0, 100], orbSpeed: [0, 100], orbDetail: [0, 100], orbSize: [65, 120], textSize: [14, 22] };
+	for (const [key, [min, max]] of Object.entries(ranges)) {
+		const number = value[key];
+		if (typeof number === "number" && Number.isInteger(number) && number >= min && number <= max) result[key] = number;
 	}
 	if (text(value.avatar, 36_000) && (value.avatar === "" || /^data:image\/jpeg;base64,\/9j\/[a-z0-9+/]+={0,2}$/i.test(value.avatar))) result.avatar = value.avatar;
 	return result;

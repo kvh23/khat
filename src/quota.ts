@@ -1,7 +1,7 @@
 import type { Account } from "./accounts";
 import type { Env } from "./types";
 
-const DAILY_BUDGET = 8000;
+export const DAILY_BUDGET = 8000;
 
 type Kind = "text" | "image" | "retry";
 type Counts = { text: number; image: number };
