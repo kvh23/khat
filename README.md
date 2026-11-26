@@ -1,153 +1,49 @@
-# LLM Chat Application Template
+# Khat
 
-A simple, ready-to-deploy chat application template powered by Cloudflare Workers AI. This template provides a clean starting point for building AI chat applications with streaming responses.
+Khat is a bilingual chat workspace for English and Danish. It runs on Cloudflare Workers with streamed replies from [Workers AI’s Llama 3.3 70B Instruct FP8 Fast model](https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/).
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/llm-chat-app-template)
+## Review locally
 
-<!-- dash-content-start -->
+Use Node.js 22 or newer and install the locked dependencies.
 
-## Demo
-
-This template demonstrates how to build an AI-powered chat interface using Cloudflare Workers AI with streaming responses. It features:
-
-- Real-time streaming of AI responses using Server-Sent Events (SSE)
-- Easy customization of models and system prompts
-- Support for AI Gateway integration
-- Clean, responsive UI that works on mobile and desktop
-
-## Features
-
-- 💬 Simple and responsive chat interface
-- ⚡ Server-Sent Events (SSE) for streaming responses
-- 🧠 Powered by Cloudflare Workers AI LLMs
-- 🛠️ Built with TypeScript and Cloudflare Workers
-- 📱 Mobile-friendly design
-- 🔄 Maintains chat history on the client
-- 🔎 Built-in Observability logging
-<!-- dash-content-end -->
-
-## Getting Started
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18 or newer)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
-- A Cloudflare account with Workers AI access
-
-### Installation
-
-1. Clone this repository:
-
-   ```bash
-   git clone https://github.com/cloudflare/templates.git
-   cd templates/llm-chat-app
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Generate Worker type definitions:
-   ```bash
-   npm run cf-typegen
-   ```
-
-### Development
-
-Start a local development server:
-
-```bash
-npm run dev
+```sh
+npm ci
+npm test -- --run
+npm run check
 ```
 
-This will start a local server at http://localhost:8787.
+The tests mock Workers AI and Wikipedia. The build check type-checks the Worker and bundles it with Wrangler in dry-run mode.
 
-Note: Using Workers AI accesses your Cloudflare account even during local development, which will incur usage charges.
+For a local UI preview without using Workers AI, run the following command and open http://localhost:8794. Sign in with username `khat` and password `local-test-only`. Use an intercepted or mocked `/api/chat` response for chat testing in this configuration.
 
-### Deployment
-
-Deploy to Cloudflare Workers:
-
-```bash
-npm run deploy
+```sh
+npm run e2e:dev -- --port 8794 --var KHAT_PASSWORD:local-test-only
 ```
 
-### Monitor
+## Cloudflare configuration
 
-View real-time logs associated with any deployed Worker:
+- Keep the existing `AI` binding and `KHAT_PASSWORD` Worker secret. The Worker fails closed when the secret is missing. Store real credentials in Cloudflare secrets and serve the app over HTTPS. Browser HTTP Basic authentication may cache credentials until the browser session ends.
+- Static assets run through the Worker before they are served. The server checks the fixed username `khat` and the configured password for assets and API requests.
+- The Cloudflare rate limit bindings allow 10 failed authentications per client IP and 18 chat requests per shared account per minute. Cloudflare enforces these limits per location, so they are approximate and do not serve as a global spending cap. Workers AI uses the existing account’s usage allowance.
+- The server bounds requests, validates message roles and settings, rejects cross-site chat requests, and keeps the safety prompt server-side. The UI constructs Markdown with DOM nodes and allows only HTTP and HTTPS links. Model safety instructions offer best-effort guidance. There is no separate output moderation service.
+- GitHub changes alone do not update the live Worker. Before releasing, verify that the target environment has the existing secret and the expected Workers AI model. Avoid reusing production credentials for review environments.
 
-```bash
-npm wrangler tail
-```
+[Cloudflare secrets](https://developers.cloudflare.com/workers/configuration/secrets/) · [Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 
-## Project Structure
+## Feature behavior and limitations
 
-```
-/
-├── public/             # Static assets
-│   ├── index.html      # Chat UI HTML
-│   └── chat.js         # Chat UI frontend script
-├── src/
-│   ├── index.ts        # Main Worker entry point
-│   └── types.ts        # TypeScript type definitions
-├── test/               # Test files
-├── wrangler.jsonc      # Cloudflare Worker configuration
-├── tsconfig.json       # TypeScript configuration
-└── README.md           # This documentation
-```
+| Feature | Behavior |
+| --- | --- |
+| History | Start, reopen, or delete chats. Chats, language, personality, and memory are stored in the current browser. Clearing site data removes them. There is no cross-device sync, and users of the same browser profile share that storage. |
+| Personality and memory | Edit either field in Settings. Khat sends these settings and the most recent messages to Workers AI. Memory changes only when you edit it. |
+| Search | The Search Wikipedia toggle searches the selected language’s Wikipedia from the Worker and shows up to four source links. The first 280 characters of the latest message are sent as the search query. Search coverage is limited to Wikipedia. |
+| Attachments | Send up to three supported UTF-8 text, data, or source files at once, up to 12,000 characters each. Each attachment’s contents are included on that send. History stores file names and messages. Reattach a file to supply its original contents again. PDF, images, Office files, and binary formats are unsupported. |
+| Speech | Dictation and read-aloud use the browser’s speech APIs and the selected language. Availability depends on the browser, device voices, and microphone permissions. The browser may use its platform’s speech service. |
+| Markdown | Replies support headings, simple lists and quotes, emphasis, links, inline code, and fenced code with a copy button. Raw HTML is displayed as text. Nested Markdown, tables, and syntax highlighting are outside the supported subset. |
+| Appearance and language | The app follows OS appearance and reduced motion settings. It adapts to desktop, tablet, and phone widths. The language button switches the interface and the default reply and speech locale. |
 
-## How It Works
+## Verification
 
-### Backend
+Automated tests cover authentication, request validation, both rate-limit responses, bilingual search with ordered sources, the model and context payload, provider errors, and SSE chunk handling.
 
-The backend is built with Cloudflare Workers and uses the Workers AI platform to generate responses. The main components are:
-
-1. **API Endpoint** (`/api/chat`): Accepts POST requests with chat messages and streams responses
-2. **Streaming**: Uses Server-Sent Events (SSE) for real-time streaming of AI responses
-3. **Workers AI Binding**: Connects to Cloudflare's AI service via the Workers AI binding
-
-### Frontend
-
-The frontend is a simple HTML/CSS/JavaScript application that:
-
-1. Presents a chat interface
-2. Sends user messages to the API
-3. Processes streaming responses in real-time
-4. Maintains chat history on the client side
-
-## Customization
-
-### Changing the Model
-
-To use a different AI model, update the `MODEL_ID` constant in `src/index.ts`. You can find available models in the [Cloudflare Workers AI documentation](https://developers.cloudflare.com/workers-ai/models/).
-
-### Using AI Gateway
-
-The template includes commented code for AI Gateway integration, which provides additional capabilities like rate limiting, caching, and analytics.
-
-To enable AI Gateway:
-
-1. [Create an AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway) in your Cloudflare dashboard
-2. Uncomment the gateway configuration in `src/index.ts`
-3. Replace `YOUR_GATEWAY_ID` with your actual AI Gateway ID
-4. Configure other gateway options as needed:
-   - `skipCache`: Set to `true` to bypass gateway caching
-   - `cacheTtl`: Set the cache time-to-live in seconds
-
-Learn more about [AI Gateway](https://developers.cloudflare.com/ai-gateway/).
-
-### Modifying the System Prompt
-
-The default system prompt can be changed by updating the `SYSTEM_PROMPT` constant in `src/index.ts`.
-
-### Styling
-
-The UI styling is contained in the `<style>` section of `public/index.html`. You can modify the CSS variables at the top to quickly change the color scheme.
-
-## Resources
-
-- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
-- [Cloudflare Workers AI Documentation](https://developers.cloudflare.com/workers-ai/)
-- [Workers AI Models](https://developers.cloudflare.com/workers-ai/models/)
+Local Chromium smoke coverage uses the real Worker for assets and mocked chat and speech responses. It checks desktop, tablet, and phone widths, system themes, both interface languages, chat lifecycle and persistence, settings, attachments, source links, streaming and cancellation, Markdown and clipboard copy, error recovery, dictation, and read-aloud controls. Production credentials, live model responses, real microphone and voice output, and physical Apple devices require verification in the target environment.
