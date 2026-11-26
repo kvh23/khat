@@ -22,6 +22,7 @@
 		"@types/node": "24.10.1",
 		"@vitest/runner": "4.1.10",
 		"@vitest/snapshot": "4.1.10",
+		"playwright": "1.65.1",
 		"typescript": "5.9.3",
 		"vitest": "4.1.10",
 		"wrangler": "4.136.1"
@@ -34,6 +35,7 @@
 		"dev": "wrangler dev",
 		"e2e:dev": "wrangler dev --config wrangler.e2e.jsonc",
 		"start": "wrangler dev",
-		"test": "vitest"
+		"test": "vitest",
+		"test:browser": "node test/browser-smoke.cjs"
 	}
 }

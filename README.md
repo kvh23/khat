@@ -1,10 +1,10 @@
-# Khat
+# Khat 2.0
 
-Khat is a bilingual chat workspace for English and Danish. It runs on Cloudflare Workers with streamed replies from [Workers AI’s Llama 3.3 70B Instruct FP8 Fast model](https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/).
+Khat is a bilingual AI workspace for chat and image generation. It uses the existing Cloudflare Worker and Workers AI binding. The interface follows the system theme by default and supports a custom accent, reduced motion, and English or Danish.
 
-## Review locally
+## Review and test
 
-Use Node.js 22 or newer and install the locked dependencies.
+Use Node.js 22 or newer.
 
 ```sh
 npm ci
@@ -12,38 +12,54 @@ npm test -- --run
 npm run check
 ```
 
-The tests mock Workers AI and Wikipedia. The build check type-checks the Worker and bundles it with Wrangler in dry-run mode.
+The automated tests mock model and Wikipedia responses. The build check runs TypeScript and a Wrangler deployment dry run. No Cloudflare API token is needed.
 
-For a local UI preview without using Workers AI, run the following command and open http://localhost:8794. Sign in with username `khat` and password `local-test-only`. Use an intercepted or mocked `/api/chat` response for chat testing in this configuration.
+For a local browser review, use the test-only password shown below. Open http://localhost:8797 and sign in with username `khat`. You can create an encrypted profile and use the interface. This configuration omits the AI binding so testing uses no Workers AI allocation.
 
 ```sh
-npm run e2e:dev -- --port 8794 --var KHAT_PASSWORD:local-test-only
+npm run e2e:dev -- --port 8797 --var KHAT_PASSWORD:local-test-only
 ```
 
-## Cloudflare configuration
+With the local Worker running, install Playwright’s Chromium and run the browser smoke test from another terminal. Set `KHAT_CHROMIUM_PATH` if using a compatible system Chromium.
 
-- Keep the existing `AI` binding and `KHAT_PASSWORD` Worker secret. The Worker fails closed when the secret is missing. Store real credentials in Cloudflare secrets and serve the app over HTTPS. Browser HTTP Basic authentication may cache credentials until the browser session ends.
-- Static assets run through the Worker before they are served. The server checks the fixed username `khat` and the configured password for assets and API requests.
-- The Cloudflare rate limit bindings allow 10 failed authentications per client IP and 18 chat requests per shared account per minute. Cloudflare enforces these limits per location, so they are approximate and do not serve as a global spending cap. Workers AI uses the existing account’s usage allowance.
-- The server bounds requests, validates message roles and settings, rejects cross-site chat requests, and keeps the safety prompt server-side. The UI constructs Markdown with DOM nodes and allows only HTTP and HTTPS links. Model safety instructions offer best-effort guidance. There is no separate output moderation service.
-- GitHub changes alone do not update the live Worker. Before releasing, verify that the target environment has the existing secret and the expected Workers AI model. Avoid reusing production credentials for review environments.
+```sh
+npx playwright install chromium
+npm run test:browser
+```
 
-[Cloudflare secrets](https://developers.cloudflare.com/workers/configuration/secrets/) · [Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+The browser test intercepts chat and Studio requests and simulates browser speech. It covers the profile lock, legacy import, personalization and memory, responsive themes, chat controls, source links, Studio cropping and downloads, and archive/search behavior.
 
-## Feature behavior and limitations
+## Cloudflare catalog and free allocation
 
-| Feature | Behavior |
-| --- | --- |
-| History | Start, reopen, or delete chats. Chats, language, personality, and memory are stored in the current browser. Clearing site data removes them. There is no cross-device sync, and users of the same browser profile share that storage. |
-| Personality and memory | Edit either field in Settings. Khat sends these settings and the most recent messages to Workers AI. Memory changes only when you edit it. |
-| Search | The Search Wikipedia toggle searches the selected language’s Wikipedia from the Worker and shows up to four source links. The first 280 characters of the latest message are sent as the search query. Search coverage is limited to Wikipedia. |
-| Attachments | Send up to three supported UTF-8 text, data, or source files at once, up to 12,000 characters each. Each attachment’s contents are included on that send. History stores file names and messages. Reattach a file to supply its original contents again. PDF, images, Office files, and binary formats are unsupported. |
-| Speech | Dictation and read-aloud use the browser’s speech APIs and the selected language. Availability depends on the browser, device voices, and microphone permissions. The browser may use its platform’s speech service. |
-| Markdown | Replies support headings, simple lists and quotes, emphasis, links, inline code, and fenced code with a copy button. Raw HTML is displayed as text. Nested Markdown, tables, and syntax highlighting are outside the supported subset. |
-| Appearance and language | The app follows OS appearance and reduced motion settings. It adapts to desktop, tablet, and phone widths. The language button switches the interface and the default reply and speech locale. |
+Catalog and rates checked on 26 November 2026. Workers AI on the Workers Free plan includes 10,000 Neurons per day across the Cloudflare account. The documented prices below describe consumption within that allocation. These are Cloudflare-hosted models, and Khat does not enable paid services. Account owners should keep the account on Workers Free to prevent paid overage, since other Workers share the allocation. [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) · [Model catalog](https://developers.cloudflare.com/workers-ai/models/)
 
-## Verification
+| Mode | Model | Neurons per million input / output tokens |
+| --- | --- | --- |
+| Khat Instant | [Llama 3.1 8B Instruct FP8](https://developers.cloudflare.com/workers-ai/models/llama-3.1-8b-instruct-fp8/) | 13,778 / 26,128 |
+| Khat Think | [Qwen3 30B A3B FP8](https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/) | 4,625 / 30,475 |
+| Khat Pro | [Gemma 4 26B A4B IT](https://developers.cloudflare.com/workers-ai/models/gemma-4-26b-a4b-it/) | 9,091 / 27,273 |
+| Existing model and fallback | [Llama 3.3 70B Instruct FP8 Fast](https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/) | 26,668 / 204,805 |
+| Evaluated, excluded | [NVIDIA Nemotron 3 Super 120B A12B](https://developers.cloudflare.com/workers-ai/models/nemotron-3-120b-a12b/) | 45,455 / 136,364. Cloudflare marks it deprecated as of 20 November 2026. |
 
-Automated tests cover authentication, request validation, both rate-limit responses, bilingual search with ordered sources, the model and context payload, provider errors, and SSE chunk handling.
+Automatic selection uses prompt and context length and Danish/English reasoning cues. These rules are heuristic. The model shown on a completed reply is the model that started its stream. If the selected provider call fails before streaming, Khat can try a fallback within the remaining budget. A stream that fails in progress can be retried by the user. Thinking traces are omitted from the rendered answer. The candidate models were evaluated against the official catalog, API contracts, capabilities and rates. Live quality, latency, and account-specific access have not been benchmarked.
 
-Local Chromium smoke coverage uses the real Worker for assets and mocked chat and speech responses. It checks desktop, tablet, and phone widths, system themes, both interface languages, chat lifecycle and persistence, settings, attachments, source links, streaming and cancellation, Markdown and clipboard copy, error recovery, dictation, and read-aloud controls. Production credentials, live model responses, real microphone and voice output, and physical Apple devices require verification in the target environment.
+Studio calls [FLUX.1 Schnell](https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/) at four steps. Cloudflare lists 4.8 Neurons per 512×512 tile and 9.6 per step. The documented API does not accept output dimensions. Portrait and landscape add composition guidance and use a local center crop for the preview, history, and downloaded JPEG.
+
+## Security and usage
+
+- The Worker protects static assets and API routes with the existing `khat` / `KHAT_PASSWORD` authentication. Keep the existing secret bound in Cloudflare. The Worker fails closed when the secret is missing. Serve it over HTTPS.
+- A SQLite-backed Cloudflare Durable Object atomically reserves usage for the entire Khat Worker, across locations. Each UTC day permits up to 35 chat requests, 8 Studio attempts, and 8,000 estimated Neurons, whichever limit is hit first. Failed or cancelled attempts consume their reservations. Each fallback reserves more estimated Neurons, and model input/output caps apply. Reservations estimate the upper cost using submitted UTF-8 bytes plus overhead and the output token cap. Studio reserves 500 Neurons for the generation and safety calls. These are conservative app limits, not a Cloudflare billing meter. The Cloudflare Free plan enforces the account-wide limit.
+- The existing per-location rate limits still apply. The API validates input and modes, rejects cross-site requests, and limits request and response sizes. Markdown uses DOM text nodes and HTTP(S) links.
+- All chats use a server-owned teen-appropriate safety prompt. Studio uses Gemma 4 for separate prompt and visual output screening. A denial, malformed response, or classifier failure withholds the image. Model-based screening can make mistakes. Text streams are guided by the system prompt and have no independent output classifier.
+- Profiles use client-side AES-GCM encryption with PBKDF2-derived keys and unique salts. Profile names are visible in the picker. Each vault is unlocked by its own passphrase and can be open in only one tab at a time. Reloading locks it. A forgotten passphrase cannot be recovered. Protect the unlocked session and use a trusted device. The shared Worker login is separate from local profile passphrases.
+- Profile data is local to this browser and origin. Khat has no server history endpoint and no cross-device sync. Requests send only the current profile’s relevant context to Workers AI. Existing unencrypted history can be imported into a profile by selecting the import option at creation. Khat removes old storage only after the encrypted copy is saved.
+
+[Cloudflare secrets](https://developers.cloudflare.com/workers/configuration/secrets/) · [Durable Objects on Workers Free](https://developers.cloudflare.com/durable-objects/platform/pricing/) · [Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+
+## Feature limitations
+
+- Conversation search covers titles and messages in the current profile’s active or archived view. Editing a message replaces later turns on a successful reply. Regenerate acts on the latest reply. These actions do not re-send the original attachments. Stop cancels the browser stream and may keep partial text. Cloudflare can continue processing an already-started call.
+- Memory is off by default. Inspect, edit, or clear it in Settings, then save. It is user-managed and has no automatic extraction. The assistant name, style, length, and instructions are preferences within the server safety rules.
+- Search is Wikipedia only. The selected language’s Wikipedia receives up to 280 characters of the latest prompt when search is on. Attachments support up to three UTF-8 text, data, or source files of 12,000 characters each. Previous attachments retain filenames only.
+- Studio stores up to 12 images in the encrypted local profile. Download anything you want to keep outside the browser before clearing site data.
+- The vault requires a modern browser with IndexedDB, Web Crypto, and Web Locks. Speech availability depends on the browser, its platform service and device permissions. Markdown covers common headings, lists, quotes, emphasis, links, and fenced code with copy. Native Safari and physical Apple devices, Cloudflare account-level model access, and real image safety responses remain to be checked in a review environment.
