@@ -1,3 +1,4 @@
+import type { Account } from "./accounts";
 import { reserve } from "./quota";
 import type { Env } from "./types";
 
@@ -32,13 +33,13 @@ async function permitted(env: Env, content: UserMessage["content"]) {
 	return (output.response ?? output.choices?.[0]?.message?.content)?.trim() === "ALLOW";
 }
 
-export async function generateImage(input: Record<string, unknown>, env: Env) {
+export async function generateImage(input: Record<string, unknown>, env: Env, account?: Account | null) {
 	const { prompt, style, ratio } = input;
 	if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 900 ||
 		typeof style !== "string" || !Object.hasOwn(styles, style) || typeof ratio !== "string" || !Object.hasOwn(ratios, ratio)) {
 		return { error: "invalid", status: 400 } as const;
 	}
-	if (!await reserve(env, "image", 500)) return { error: "dailyLimit", status: 429 } as const;
+	if (!await reserve(env, "image", 500, account)) return { error: "dailyLimit", status: 429 } as const;
 	try {
 		const description = [prompt.trim(), styles[style as keyof typeof styles], ratios[ratio as keyof typeof ratios]].filter(Boolean).join(". ");
 		if (!await permitted(env, description)) return { error: "imageBlocked", status: 422 } as const;

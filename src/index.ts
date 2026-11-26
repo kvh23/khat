@@ -1,9 +1,14 @@
+import { accountRoute, authenticate } from "./accounts";
+import type { Account } from "./accounts";
+import { adminRoute } from "./admin";
+import { memoryContext, readWorkspace, requestedMemory, saveWorkspace, studioHistory } from "./workspace";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Env } from "./types";
 
 import { allowedMode, estimatedNeurons, modelOrder, models } from "./intelligence";
 import { reserve } from "./quota";
 import { generateImage } from "./studio";
+export { PasswordHasher } from "./password-hasher";
 export { UsageGate } from "./quota";
 const MAX_BODY = 192 * 1024;
 const headers = {
@@ -33,7 +38,7 @@ function authorized(request: Request, password: string) {
 	return timingSafeEqual(hash(Buffer.from(match[1], "base64")), hash(`khat:${password}`));
 }
 
-async function readBody(request: Request): Promise<unknown> {
+async function readBody(request: Request, max = MAX_BODY): Promise<unknown> {
 	const reader = request.body?.getReader();
 	if (!reader) throw new Error("invalid");
 	let bytes = 0;
@@ -44,7 +49,7 @@ async function readBody(request: Request): Promise<unknown> {
 			const { done, value } = await reader.read();
 			if (done) return JSON.parse(body + decoder.decode());
 			bytes += value.byteLength;
-			if (bytes > MAX_BODY) throw new Error("size");
+			if (bytes > max) throw new Error("size");
 			body += decoder.decode(value, { stream: true });
 		}
 	} finally {
@@ -104,7 +109,7 @@ function isAttachment(value: unknown): value is Attachment {
 		shortText(value.text, 12000) && !value.text.includes("\0");
 }
 
-async function chat(request: Request, env: Env) {
+async function chat(request: Request, env: Env, account: Account | null) {
 	let input;
 	try {
 		input = await readBody(request);
@@ -116,12 +121,12 @@ async function chat(request: Request, env: Env) {
 		!input.messages.every(isMessage) || input.messages[input.messages.length - 1]?.role !== "user") return error(400, "invalid");
 
 	const history: Message[] = input.messages;
-	const { personality = "", memory = "", files = [], search = false, language = "en",
+	const { personality = "", memory: localMemory = "", temporary = false, files = [], search = false, language = "en",
 		mode = "legacy", aiName = "", instructions = "", style = "balanced", length = "balanced" } = input;
 	if (!allowedMode(mode) || !shortText(aiName, 40) || !shortText(instructions, 2000) ||
 		typeof style !== "string" || !["balanced", "direct", "warm", "formal"].includes(style) ||
 		typeof length !== "string" || !["brief", "balanced", "detailed"].includes(length)) return error(400, "invalid");
-	if (!shortText(personality, 1000) || !shortText(memory, 3000) || typeof search !== "boolean" ||
+	if (!shortText(personality, 1000) || typeof temporary !== "boolean" || !shortText(localMemory, 3000) || typeof search !== "boolean" ||
 		(language !== "en" && language !== "da") || !Array.isArray(files) || files.length > 3 ||
 		!files.every(isAttachment)) {
 		return error(400, "invalid");
@@ -138,6 +143,10 @@ async function chat(request: Request, env: Env) {
 			return error(502, "searchFailed");
 		}
 	}
+	const latest = history[history.length - 1].content;
+	const saved = !temporary && account ? await memoryContext(env.DB!, account, latest) : null;
+	const memory = temporary ? "" : account ? saved?.context ?? "" : localMemory;
+	const suggestion = saved?.enabled ? requestedMemory(latest) : "";
 	const context = JSON.stringify({
 		aiName, personality, instructions, style, length, memory, files,
 		searchResults: sources.map((source, index) => ({ number: index + 1, ...source })),
@@ -151,7 +160,7 @@ async function chat(request: Request, env: Env) {
 	const order = modelOrder(mode, history[history.length - 1].content, total);
 	for (const [index, model] of order.entries()) {
 		if (request.signal.aborted) return error(499, "stopped");
-		if (!await reserve(env, index === 0 ? "text" : "retry", estimatedNeurons(model, messages, maxTokens))) {
+		if (!await reserve(env, index === 0 ? "text" : "retry", estimatedNeurons(model, messages, maxTokens), account)) {
 			return error(429, "dailyLimit");
 		}
 		try {
@@ -162,6 +171,7 @@ async function chat(request: Request, env: Env) {
 					...headers,
 					"content-type": "text/event-stream; charset=utf-8",
 					"x-khat-model": model,
+					"x-khat-memory": encodeURIComponent(suggestion),
 					"x-khat-fallback": String(index > 0),
 					"x-khat-sources": encodeURIComponent(JSON.stringify(sources.map(({ title, url }) => ({ title, url })))),
 				},
@@ -193,27 +203,77 @@ export default {
 				for (const [key, value] of Object.entries(headers)) response.headers.set(key, value);
 				return response;
 			}
-			if (!["/api/chat", "/api/image"].includes(url.pathname)) return error(404, "notFound");
-			if (request.method !== "POST") return error(405, "invalid", { allow: "POST" });
+			const path = url.pathname;
+			const generation = path === "/api/chat" || path === "/api/image";
+			const gets = ["/api/session", "/api/workspace", "/api/export", "/api/admin", "/api/studio-history"];
+			const posts = ["/api/login", "/api/register", "/api/logout", "/api/delete-account", "/api/workspace",
+				"/api/admin/invite", "/api/admin/user", "/api/studio-history"];
+			if ((env.ACCOUNTS_REQUIRED === "true" || env.DB) && (!env.DB || !env.PASSWORDS)) return error(503, "unconfigured");
+			if (!generation && (!env.DB || ![...gets, ...posts].includes(path))) return error(404, "notFound");
+			if (!(request.method === "GET" && gets.includes(path)) && !(request.method === "POST" && (generation || posts.includes(path)))) {
+				return error(405, "invalid", { allow: gets.includes(path) && posts.includes(path) ? "GET, POST" : gets.includes(path) ? "GET" : "POST" });
+			}
 			const origin = request.headers.get("Origin");
 			if ((origin && origin !== url.origin) || request.headers.get("Sec-Fetch-Site") === "cross-site") {
 				return error(403, "forbidden");
 			}
-			if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("Content-Type") ?? "")) {
+			if (request.method === "POST" && !/^application\/json(?:\s*;|$)/i.test(request.headers.get("Content-Type") ?? "")) {
 				return error(415, "invalid");
 			}
-			if (!(await env.CHAT_LIMIT.limit({ key: "khat" })).success) {
-				return error(429, "limited", { "retry-after": "60" });
+			const account = env.DB ? await authenticate(request, env.DB) : null;
+			const publicRoute = ["/api/session", "/api/login", "/api/register"].includes(path);
+			if (env.DB && !publicRoute) {
+				if (!account) return error(401, "signInRequired");
+				// Reject requests from a stale tab after the browser cookie changes accounts.
+				const scope = request.headers.get("X-Khat-Account");
+				if (scope !== account.id) return error(409, "sessionChanged");
 			}
-			if (url.pathname === "/api/chat") return await chat(request, env);
-			let input;
+			if (generation) {
+				if (env.DB && !account) return error(401, "signInRequired");
+				if (!(await env.CHAT_LIMIT.limit({ key: "khat" })).success) return error(429, "limited", { "retry-after": "60" });
+				if (path === "/api/chat") return await chat(request, env, account);
+			}
+			let input: unknown = {};
 			try {
-				input = await readBody(request);
+				if (request.method === "POST") input = await readBody(request, path === "/api/workspace" ? 700_000 :
+					path === "/api/studio-history" ? 240_000 : MAX_BODY);
 			} catch (err) {
 				return err instanceof Error && err.message === "size" ? error(413, "tooLarge") : error(400, "invalid");
 			}
 			if (!isRecord(input)) return error(400, "invalid");
-			const result = await generateImage(input, env);
+			if (!generation) {
+				let response: Response;
+				if (["/api/session", "/api/login", "/api/register", "/api/logout", "/api/delete-account"].includes(path)) {
+					response = await accountRoute(path, request, input, env, account);
+				} else {
+					if (!account) return error(401, "signInRequired");
+					const db = env.DB!;
+					if (path.startsWith("/api/admin")) response = await adminRoute(path, input, env, account);
+					else if (path === "/api/studio-history") response = await studioHistory(db, account.id, request.method === "POST" ? input : undefined);
+					else if (request.method === "POST") {
+						const result = await saveWorkspace(db, account.id, input);
+						response = result === "saved" ? new Response(null, { status: 204 }) : error(result === "syncConflict" ? 409 : 400, result);
+					} else {
+						const since = url.searchParams.get("since");
+						if (path === "/api/workspace" && since !== null) {
+							const row = await db.prepare("SELECT revision FROM workspaces WHERE owner=?").bind(account.id)
+								.first<{ revision: number }>();
+							if (String(row?.revision) === since) return new Response(null, { status: 204, headers });
+						}
+						const workspace = await readWorkspace(db, account.id);
+						if (path === "/api/export") {
+							const gallery = await (await studioHistory(db, account.id)).json();
+							response = Response.json({ username: account.username, ...workspace, ...gallery as object }, {
+								headers: { "Content-Disposition": 'attachment; filename="khat-account.json"' },
+							});
+						} else response = Response.json(workspace);
+					}
+				}
+				const withHeaders = new Response(response.body, response);
+				for (const [name, value] of Object.entries(headers)) withHeaders.headers.set(name, value);
+				return withHeaders;
+			}
+			const result = await generateImage(input, env, account);
 			if ("error" in result && result.error) return error(result.status, result.error);
 			return Response.json({ image: result.image }, { headers });
 		} catch {
