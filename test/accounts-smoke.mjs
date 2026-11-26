@@ -217,15 +217,29 @@ try {
     await label("Orb style").selectOption("aurora");
     await label("Enable animations").uncheck();
     await label("Include memory in AI requests").check();
+    const saveSettings = page.waitForResponse(response => response.url().endsWith("/api/workspace") &&
+      response.request().method() === "POST" && response.status() === 204);
     await button("Save").click();
+    await saveSettings;
     await page.waitForFunction(() => document.documentElement.dataset.orbStyle === "aurora");
     assert.equal(await orb.evaluate(element => getComputedStyle(element).animationName), "none");
+    const beforeTemporary = await read(admin);
     await button("Temporary chat").click();
+    assert.equal(await page.getByText("Temporary chat", { exact: true }).filter({ visible: true }).count(), 1);
+    assert.equal(await page.locator("#temporary-note").isVisible(), true);
+    assert.equal(await page.locator("#chat-title").isVisible(), false);
     await send("Temporarily remember that I prefer concise answers");
     assert.equal(expected.at(-1).temporary, true);
+    assert.equal(expected.at(-1).memory, "");
+    const afterTemporary = await read(admin);
+    assert.deepEqual(afterTemporary.chats, beforeTemporary.chats);
+    assert.deepEqual(afterTemporary.memories, beforeTemporary.memories);
+    assert.equal(afterTemporary.revision, beforeTemporary.revision);
     assert.equal(checks.at(-1), "thinking");
     assert.equal(await page.locator("html").getAttribute("data-orb-state"), "idle");
     await button("Temporary chat").click();
+    assert.equal(await page.locator("#temporary-note").isVisible(), false);
+    assert.equal(await page.locator("#chat-title").isVisible(), true);
     assert.equal(await page.getByText("Temporarily remember", { exact: false }).count(), 0);
     const savedReply = page.waitForResponse(response => response.url().endsWith("/api/workspace") &&
       response.request().method() === "POST" && response.status() === 204);
