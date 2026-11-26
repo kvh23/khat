@@ -60,6 +60,9 @@ const subtitles = [
 ];
 
 const prompts = [
+  [["Summarize a text", "Summarize the key points and flag open questions: "], ["Opsummér en tekst", "Opsummér hovedpunkterne, og fremhæv åbne spørgsmål: "]],
+  [["Practice a topic", "Quiz me one question at a time on this topic: "], ["Øv dig på et emne", "Stil mig ét spørgsmål ad gangen om dette emne: "]],
+  [["Translate a text", "Help me translate this while keeping the tone natural: "], ["Oversæt en tekst", "Hjælp mig med en naturlig oversættelse, der bevarer tonen: "]],
   [["Understand a topic", "Explain a topic using a concrete example: "], ["Forstå et emne", "Forklar et emne med et konkret eksempel: "]],
   [["Revise a draft", "Help me make this draft clearer without changing my tone: "], ["Gør et udkast skarpere", "Gør mit udkast tydeligere, og bevar min tone: "]],
   [["Debug some code", "Help me debug this code. Ask for the error and expected behavior if needed: "], ["Find en fejl i kode", "Hjælp mig med at finde fejlen. Spørg om fejlbeskeden og det forventede resultat, hvis det er nødvendigt: "]],

@@ -30,7 +30,7 @@ function materialTier() {
 }
 
 export function mountGlass() {
-  for (const element of document.querySelectorAll(".top, aside, #composer, dialog, #mode, #status, .suggestions button")) {
+  for (const element of document.querySelectorAll(".top, aside, #composer, dialog, #mode, #model-options, #status, .suggestions button")) {
     element.classList.add("liquid-glass");
   }
   materialTier();
