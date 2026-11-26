@@ -1,3 +1,4 @@
+import { welcomeCopy } from "./welcome.js";
 import { translations } from "./i18n.js";
 import { markdown, node, webUrl } from "./markdown.js";
 import { readReply } from "./stream.js";
@@ -89,16 +90,19 @@ let voiceReply = false;
 
 function renderUsage() {
   const target = byId("usage");
+  const warning = byId("quota-warning");
+  warning.hidden = true;
   const studioUsage = byId("studio-allowance");
   target.hidden = studioUsage.hidden = !dailyUsage;
   if (!dailyUsage) return;
   const { text = 0, image = 0, textLimit, imageLimit, estimatedNeurons, budget } = dailyUsage;
-  target.textContent = `${labels.dailyUsage} · ${labels.textLimit} ${text}/${textLimit} · ${labels.imageLimit} ${image}/${imageLimit} · ${labels.estimatedUsage} ${estimatedNeurons}/${budget}`;
+  target.textContent = `${labels.dailyUsage} · ${labels.remaining}: ${labels.textLimit} ${Math.max(0, textLimit - text)}/${textLimit} · ${labels.imageLimit} ${Math.max(0, imageLimit - image)}/${imageLimit} · ${labels.estimatedUsage} ${estimatedNeurons}/${budget}`;
   const near = (textLimit > 0 && text >= textLimit * .8) || (imageLimit > 0 && image >= imageLimit * .8) || estimatedNeurons >= budget * .8;
   target.title = labels.usageHelp;
   studioUsage.textContent = `${labels.dailyUsage} · ${labels.imageLimit} ${image}/${imageLimit} · ${labels.studioStorageLimit}`;
   target.toggleAttribute("data-near", near);
-  if (near) target.textContent += ` · ${labels.nearLimit}`;
+  warning.hidden = !near;
+  warning.textContent = near ? labels.nearLimit : "";
 }
 
 async function refreshUsage() {
@@ -214,7 +218,9 @@ function enterProfile(session) {
   temporary = undefined;
   refreshIdentity();
   byId("account-preferences").hidden = byId("account-memories").hidden = !session.account;
+  preferences.querySelector('[data-section="account-preferences"]').hidden = !session.account;
   byId("local-memory").hidden = Boolean(session.account);
+  byId("display-name").required = Boolean(session.account);
   byId("temporary").hidden = !session.account;
   byId("temporary").setAttribute("aria-pressed", "false");
   byId("admin-open").hidden = session.account?.role !== "admin";
@@ -230,6 +236,7 @@ function enterProfile(session) {
   renderLanguage();
   updateControls();
   refreshUsage();
+  if (session.account && !state.displayName?.trim()) byId("name-onboarding").showModal();
 }
 
 for (const form of [unlockForm, createForm]) {
@@ -319,6 +326,9 @@ function accountForm() {
   byId("account-password").autocomplete = registering ? "new-password" : "current-password";
   byId("invitation-field").hidden = !registering;
   byId("invite").required = registering;
+  byId("registration-name-field").hidden = !registering;
+  byId("registration-name").disabled = !registering;
+  byId("registration-name").required = registering;
 }
 
 async function openAccount(account) {
@@ -376,6 +386,36 @@ byId("account-form").addEventListener("submit", async event => {
   } finally {
     byId("account-password").value = "";
     submit.disabled = false;
+  }
+});
+
+const onboarding = byId("name-onboarding");
+onboarding.addEventListener("cancel", event => event.preventDefault());
+byId("name-onboarding-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const name = byId("onboarding-name").value.trim();
+  const status = byId("onboarding-status");
+  if (!name || /[\p{Cc}]/u.test(name)) {
+    status.textContent = labels.displayNameInvalid;
+    return;
+  }
+  const button = event.currentTarget.querySelector("button");
+  if (button.disabled) return;
+  button.disabled = true;
+  const session = vault;
+  try {
+    await session.save({ ...state, displayName: name });
+    if (vault !== session) return;
+    state.displayName = name;
+    refreshIdentity();
+    renderWelcome();
+    onboarding.close();
+    status.textContent = "";
+    byId("onboarding-name").value = "";
+  } catch (error) {
+    status.textContent = labels[error.message] || labels.storageFailed;
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -586,7 +626,7 @@ function stopSpeech() {
   speaking = null;
   window.speechSynthesis.cancel();
   if (button) {
-    button.textContent = labels.read;
+    actionLabel(button, "read");
     button.setAttribute("aria-pressed", "false");
   }
   motionState({ speaking: false });
@@ -602,7 +642,7 @@ function speak(message, button) {
   utterance.lang = message.language === "da" ? "da-DK" : "en-US";
   speaking = { button, utterance };
   if (button) {
-    button.textContent = labels.stopReading;
+    actionLabel(button, "stopReading");
     button.setAttribute("aria-pressed", "true");
   }
   utterance.onstart = () => {
@@ -627,8 +667,20 @@ function speak(message, button) {
   }
 }
 
+const actionPaths = {
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  edit: '<path d="m4 20 1-5L16 4l4 4L9 19zm10-14 4 4"/>',
+  read: '<path d="M4 9h4l5-4v14l-5-4H4zm13-1a6 6 0 0 1 0 8m2-10a9 9 0 0 1 0 12"/>',
+  regenerate: '<path d="M20 11a8 8 0 1 0-2 6m2-11v5h-5"/>',
+};
+function actionLabel(button, key) {
+  button.title = labels[key];
+  button.setAttribute("aria-label", labels[key]);
+}
 function messageAction(actions, key, onClick) {
-  const button = node("button", labels[key]);
+  const button = node("button", undefined, "message-action");
+  button.innerHTML = `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${actionPaths[key]}</svg>`;
+  actionLabel(button, key);
   button.type = "button";
   button.disabled = Boolean(pending);
   button.addEventListener("click", onClick);
@@ -648,8 +700,9 @@ function messageElement(message, streamed = false, index = -1) {
     }
   });
   if (message.role === "user") {
-    element.textContent = message.content;
-    if (message.files?.length) element.append(node("div", message.files.join(" · "), "message-label"));
+    const bubble = node("div", message.content, "message-bubble");
+    if (message.files?.length) bubble.append(node("div", message.files.join(" · "), "message-label"));
+    element.append(bubble);
     messageAction(actions, "edit", () => {
       editing = index;
       byId("edit-text").value = message.content;
@@ -689,11 +742,9 @@ function messageElement(message, streamed = false, index = -1) {
     element.append(disclosure);
   }
   if ("speechSynthesis" in window && "SpeechSynthesisUtterance" in window) {
-    const read = node("button", labels.read, "read");
-    read.type = "button";
+    const read = messageAction(actions, "read", () => speak(message, read));
+    read.classList.add("read");
     read.setAttribute("aria-pressed", "false");
-    read.addEventListener("click", () => speak(message, read));
-    actions.append(read);
   }
   if (index >= 1 && current()?.messages[index - 1]?.role === "user") {
     const regenerate = messageAction(actions, "regenerate", () => submitChat(current().messages[index - 1].content, index - 1, true));
@@ -786,6 +837,7 @@ function renderLanguage() {
   accountForm();
   if (vault?.account) preferences.querySelector("[data-label=privacy]").textContent = labels.accountPrivacy;
   byId("history-search").placeholder = labels.searchHistory;
+  renderWelcome();
   labelIcon("archives", labels.archive);
   labelIcon("menu", byId("menu").getAttribute("aria-expanded") === "true" ? labels.collapse : labels.expand);
   appearance();
@@ -807,6 +859,7 @@ function openChat(id, isTemporary = false) {
   cancelCapture?.();
   temporary = isTemporary ? { id: crypto.randomUUID(), messages: [] } : undefined;
   state.active = id;
+  if (!id) renderWelcome();
   prompt.value = "";
   fitPrompt();
   files = [];
@@ -970,6 +1023,11 @@ function queueVisualPreview() {
   });
 }
 
+preferences.querySelector("[data-settings-nav]").addEventListener("click", event => {
+  const button = event.target.closest("[data-section]");
+  if (!button) return;
+  byId(button.dataset.section).scrollIntoView({ block: "start" });
+});
 preferences.addEventListener("input", event => {
   if (appearanceControls.has(event.target)) queueVisualPreview();
 });
@@ -1001,6 +1059,11 @@ preferences.addEventListener("close", async () => {
   const selected = byId("avatar-file").files[0];
   const session = vault;
   const values = Object.fromEntries(Object.entries(settingIds).map(([key, id]) => [key, byId(id).value.trim()]));
+  if (session?.account && (!values.displayName || /[\p{Cc}]/u.test(values.displayName))) {
+    appearance();
+    report("displayNameInvalid");
+    return;
+  }
   const memoryEnabled = byId("memory-enabled").checked;
   const visualValues = previewVisual();
   const memories = memoryDraft.filter(entry => entry.content.trim()).map(entry => ({ ...entry, content: entry.content.trim() }));
@@ -1014,6 +1077,7 @@ preferences.addEventListener("close", async () => {
   const nameChanged = state.aiName !== values.aiName;
   state = { ...state, ...values, ...visualValues, memoryEnabled, avatar, memories };
   refreshIdentity();
+  renderWelcome();
   appearance();
   if (nameChanged) renderMessages();
   savingSettings = true;
@@ -1034,13 +1098,23 @@ confirmDelete.addEventListener("close", () => {
   persist();
 });
 
-document.querySelectorAll("[data-prompt]").forEach(button => {
-  button.addEventListener("click", () => {
-    prompt.value = labels.prompts[button.dataset.prompt];
-    updateControls();
-    prompt.focus();
-  });
-});
+function renderWelcome() {
+  const { heading, subtitle, suggestions } = welcomeCopy(state.language, temporary ? "" : state.displayName);
+  byId("welcome").querySelector("h1").textContent = heading;
+  byId("welcome-intro").textContent = subtitle;
+  const container = byId("welcome").querySelector(".suggestions");
+  container.replaceChildren(...suggestions.map(([label, text]) => {
+    const button = node("button", label, "liquid-glass");
+    button.type = "button";
+    button.addEventListener("click", () => {
+      prompt.value = text;
+      fitPrompt();
+      updateControls();
+      prompt.focus();
+    });
+    return button;
+  }));
+}
 byId("search").addEventListener("click", event => {
   search = !search;
   event.currentTarget.setAttribute("aria-pressed", String(search));

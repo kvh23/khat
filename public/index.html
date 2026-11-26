@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Khat, your space to think.">
   <title>Khat</title>
+  <link rel="icon" href="/khat-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/khat.css">
   <link rel="stylesheet" href="/motion.css">
   <link rel="stylesheet" href="/liquid.css">
@@ -15,7 +16,7 @@
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="shell" hidden>
     <aside id="sidebar" aria-label="Conversation history">
-      <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span> Khat</div>
+      <div class="brand"><img src="/khat-mark.svg" width="28" height="28" alt=""><span>Khat</span></div>
       <button type="button" id="new" class="new"><span aria-hidden="true">＋</span><span data-label="newChat">New chat</span></button>
       <button type="button" id="studio-open" class="side-button"><span aria-hidden="true">✧</span> <span data-label="studio">Studio</span></button>
       <div class="history">
@@ -54,11 +55,7 @@
           <span class="mark hero-mark" aria-hidden="true" hidden><i></i><i></i><i></i></span>
           <h1 data-label="welcome">What’s on your mind?</h1>
           <p id="welcome-intro" data-label="intro">A space to think, write, and figure things out.</p>
-          <div class="suggestions">
-            <button type="button" data-prompt="explain"><span data-label="explain">Explain a concept</span></button>
-            <button type="button" data-prompt="write"><span data-label="write">Help me write</span></button>
-            <button type="button" data-prompt="brainstorm"><span data-label="brainstorm">Brainstorm ideas</span></button>
-          </div>
+          <div class="suggestions"></div>
         </section>
         <div id="messages" class="messages" aria-live="polite"></div>
       </div>
@@ -92,7 +89,7 @@
           </div>
         </form>
         <div class="response-status"><span id="activity" class="activity" hidden aria-hidden="true"></span><p id="status" role="status"></p></div>
-        <p id="usage" hidden></p>
+        <p id="quota-warning" role="status" hidden></p>
       </footer>
     </main>
   </div>
@@ -102,7 +99,14 @@
         <h2 id="preferences-title" data-label="settings">Settings</h2>
         <button type="submit" value="cancel" id="preferences-close" class="icon-button" aria-label="Close" title="Close">×</button>
       </header>
+      <nav class="preferences-nav" aria-label="Settings" data-settings-nav>
+        <button type="button" data-section="account-preferences" data-label="profile" hidden>Profile</button>
+        <button type="button" data-section="appearance-settings" data-label="appearance">Appearance</button>
+        <button type="button" data-section="assistant-settings" data-label="assistant">Assistant</button>
+        <button type="button" data-section="memory-settings" data-label="memory">Memory</button>
+      </nav>
       <div class="preferences-content">
+      <p id="usage" hidden></p>
       <p data-label="privacy">History and settings stay in this browser. Relevant chat text, memory, and attached text go to Workers AI when you send a message.</p>
       <fieldset id="account-preferences" hidden>
         <legend data-label="profile">Profile</legend>
@@ -114,7 +118,7 @@
         <button id="import-vault" value="import" data-label="importVault">Import a local profile</button>
         <button id="delete-account" value="deleteAccount" data-label="deleteAccount">Delete account</button>
       </fieldset>
-      <fieldset>
+      <fieldset id="appearance-settings">
         <legend data-label="appearance">Appearance</legend>
         <label for="theme" data-label="theme">Theme</label>
         <select id="theme"><option value="auto" data-label="auto">Automatic</option><option value="light" data-label="light">Light</option><option value="dark" data-label="dark">Dark</option></select>
@@ -146,7 +150,7 @@
         <label class="check"><input type="checkbox" id="ambience"> <span data-label="ambience">Atmospheric background</span></label>
         <button type="button" id="reset-visual" data-label="resetVisual">Reset visual settings</button>
       </fieldset>
-      <fieldset>
+      <fieldset id="assistant-settings">
       <legend data-label="assistant">Assistant</legend>
       <label for="ai-name" data-label="aiName">AI name</label>
       <input id="ai-name" maxlength="40" placeholder="Khat">
@@ -160,7 +164,7 @@
       <textarea id="instructions" maxlength="2000" rows="3" aria-describedby="instructions-help"></textarea>
       <p id="instructions-help" class="field-help" data-label="instructionsHelp"></p>
       </fieldset>
-      <fieldset>
+      <fieldset id="memory-settings">
       <legend data-label="memory">Memory</legend>
       <label class="check"><input type="checkbox" id="memory-enabled"> <span data-label="enableMemory">Include memory in AI requests</span></label>
       <div id="account-memories" hidden>
@@ -199,6 +203,10 @@
       <input id="account-username" name="username" required pattern="[A-Za-z0-9_]{3,24}" autocomplete="username">
       <label for="account-password" data-label="accountPassword">Password</label>
       <input id="account-password" name="password" type="password" required minlength="12" maxlength="128" autocomplete="current-password">
+      <div id="registration-name-field" hidden>
+        <label for="registration-name" data-label="displayName">Display name</label>
+        <input id="registration-name" name="displayName" maxlength="40" autocomplete="nickname" disabled>
+      </div>
       <div id="invitation-field" hidden><label for="invite" data-label="invite">Invitation code</label>
       <input id="invite" name="invite" autocomplete="off" maxlength="43"></div>
       <button type="submit" class="primary" id="account-submit" data-label="signIn">Sign in</button>
@@ -206,6 +214,16 @@
       <button type="button" id="account-language" aria-label="Switch language">DA</button>
     </form>
     <p id="account-status" role="status"></p>
+  </dialog>
+  <dialog id="name-onboarding" aria-labelledby="name-onboarding-title">
+    <form id="name-onboarding-form">
+      <h2 id="name-onboarding-title" data-label="onboardingName">What should Khat call you?</h2>
+      <p data-label="onboardingHelp">A nickname or preferred name is fine. You can change it in Settings.</p>
+      <label for="onboarding-name" data-label="displayName">Display name</label>
+      <input id="onboarding-name" required maxlength="40" autocomplete="nickname">
+      <p id="onboarding-status" role="status"></p>
+      <div class="dialog-actions"><button class="primary" data-label="save">Save</button></div>
+    </form>
   </dialog>
   <dialog id="import-dialog" aria-labelledby="import-title">
     <form id="import-form">

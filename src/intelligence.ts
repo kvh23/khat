@@ -14,11 +14,12 @@ export function allowedMode(value: unknown): value is Mode {
 	return typeof value === "string" && (value === "auto" || Object.hasOwn(models, value));
 }
 
-export function modelOrder(mode: Mode, prompt: string, contextSize: number): Model[] {
+export function modelOrder(mode: Mode, prompt: string, contextSize: number, language = "en"): Model[] {
 	const selected = mode === "auto" ? automatic(prompt, contextSize) : mode;
 	if (mode === "auto") {
 		if (selected === "pro") return ["pro", "think", "instant", "legacy"];
 		if (selected === "think") return ["think", "instant", "legacy"];
+		if (language === "da") return ["thinkClassic", "instant", "legacy"];
 	}
 	if (selected === "pro") return ["pro", "legacy", "instant"];
 	if (selected === "think") return ["think", "legacy", "instant"];

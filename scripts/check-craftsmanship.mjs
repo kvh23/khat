@@ -32,12 +32,12 @@ try {
         if (route.request().method() !== "GET") {
           return route.fulfill({ json: { revision: 1 } });
         }
-        return route.fulfill({ json: { revision: 0, preferences: {}, chats: history, memories: [] } });
+        return route.fulfill({ json: { revision: 0, preferences: { displayName: "Alex" }, chats: history, memories: [] } });
       }
       if (url.pathname === "/favicon.ico") return route.fulfill({ status: 404 });
       const name = url.pathname === "/" ? "/index.html" : url.pathname;
       if (!/^\/[a-zA-Z0-9.-]+$/.test(name) || name.includes("..")) return route.fulfill({ status: 404 });
-      return route.fulfill({ contentType: name.endsWith(".html") ? "text/html" : name.endsWith(".css") ? "text/css" : "text/javascript", body: await readFile(root+name) });
+      return route.fulfill({ contentType: name.endsWith(".html") ? "text/html" : name.endsWith(".css") ? "text/css" : name.endsWith(".svg") ? "image/svg+xml" : "text/javascript", body: await readFile(root+name) });
     });
 
     const page = await context.newPage();

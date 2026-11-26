@@ -72,7 +72,7 @@ const assert = require('node:assert/strict');
       await page.getByLabel('Profile name', { exact: true }).fill(name);
       await page.getByLabel('New passphrase (12 characters minimum)').fill(password + name);
       await button('Create profile', page.locator('#create-form')).click();
-      await heading('What’s on your mind?').waitFor();
+      await page.locator("#welcome h1").waitFor();
     };
     const lock = async () => {
       await button('Lock profile').click();
@@ -119,13 +119,13 @@ const assert = require('node:assert/strict');
     const renderedTable = await page.evaluate(async () => {
       const { markdown } = await import("/markdown.js");
       const element = document.createElement("div");
-      element.append(markdown("| Size | Unit |\n| --- | --- |\n| 42 | mm |\n\nSource [1] <img src=x>\n\n```js\nconst size = 42;\n```",
+      element.append(markdown("| Size | Unit |\n| --- | --- |\n| 42 | mm |\n\nSource [1] [99] <img src=x>\n\n```js\nconst size = 42;\n```",
         { copy: "Copy", code: "Code" }, () => {}, [{ url: "https://example.test", title: "Source" }]));
       return { headers: [...element.querySelectorAll("th")].map(item => item.textContent),
         links: element.querySelectorAll("a.citation").length, unsafe: element.querySelectorAll("img").length,
-        keyword: element.querySelector(".code-keyword")?.textContent };
+        unsupported: element.textContent.includes("[99]"), keyword: element.querySelector(".code-keyword")?.textContent };
     });
-    assert.deepEqual(renderedTable, { headers: ["Size", "Unit"], links: 1, unsafe: 0, keyword: "const" });
+    assert.deepEqual(renderedTable, { headers: ["Size", "Unit"], links: 1, unsafe: 0, unsupported: false, keyword: "const" });
     assert.equal(posts[0].memory, '');
     assert.equal(posts[0].mode, 'think');
     assert.equal(posts[0].aiName, 'Aster');
@@ -245,7 +245,18 @@ const assert = require('node:assert/strict');
     await button('Delete', page.locator('#confirm')).click();
     await button('Renamed chat').waitFor({ state: 'hidden' });
     await button('Switch to Danish').click();
-    await heading('Hvad tænker du på?').waitFor();
+    await page.waitForFunction(() => document.documentElement.lang === "da");
+    const welcome = page.locator("#welcome h1");
+    await welcome.waitFor();
+    const previousWelcome = await welcome.textContent();
+    await button('Ny chat').click();
+    assert.notEqual(await welcome.textContent(), previousWelcome);
+    const suggestions = page.locator(".suggestions button");
+    assert.equal(await suggestions.count(), 3);
+    const sentBeforeSuggestion = posts.length;
+    await suggestions.first().click();
+    assert.ok((await page.locator("#prompt").inputValue()).trim());
+    assert.equal(posts.length, sentBeforeSuggestion);
     for (const [width, height, colorScheme] of [[1440, 900, 'light'], [820, 1180, 'dark'], [390, 844, 'dark'], [320, 568, 'light']]) {
       await page.setViewportSize({ width, height });
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
