@@ -1,0 +1,228 @@
+:root {
+  --glass-opacity: 77%;
+  --glass-blur: 17px;
+  --glint: #fff8;
+  --prism: #827ddd2c;
+  --abyss: #42396e25;
+  --canvas: #edf0f7;
+  --orb-glow: .62;
+  --orb-tempo: 1.2;
+  --orb-detail: .75;
+  --orb-user-size: 1;
+  --chat-type: 16px;
+  --spring: cubic-bezier(.2,.77,.24,1);
+}
+:root[data-effective-theme="dark"] {
+  --canvas: #151525;
+  --glint: #d3d4ff36;
+  --prism: #a292f535;
+  --abyss: #04030b66;
+}
+body {
+  background: var(--canvas);
+  transition: background-color var(--motion-duration) ease, color var(--motion-duration) ease;
+  isolation: isolate;
+}
+.atmosphere {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+:root[data-ambience="on"] .atmosphere { display: block; }
+.atmosphere::before, .atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: -16%;
+  background: radial-gradient(ellipse at 31% 29%, #ad9ff76e, transparent 46%),
+    radial-gradient(ellipse at 72% 65%, #63a6e844, transparent 43%);
+  opacity: .42;
+  animation: ambient-drift 31s ease-in-out infinite alternate;
+}
+.atmosphere::after {
+  background: radial-gradient(ellipse at 60% 22%, #e7c6ff72, transparent 48%),
+    radial-gradient(ellipse at 29% 65%, #a3e3e84a, transparent 41%);
+  animation-direction: alternate-reverse;
+  animation-duration: 37s;
+}
+:root[data-conversation] .atmosphere::before, :root[data-conversation] .atmosphere::after { opacity: .15; }
+@keyframes ambient-drift { from { transform: translate3d(-2%, -1%, 0); } to { transform: translate3d(5%, 3%, 0) scale(1.08); } }
+
+.liquid-glass {
+  --surface-highlight: var(--glint);
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--surface-highlight), inset 0 -1px 0 var(--prism), 0 8px 28px var(--abyss);
+}
+@supports (background: color-mix(in srgb, white 50%, transparent)) {
+  .liquid-glass {
+    background: radial-gradient(120px 96px at var(--reflection-x, 40%) var(--reflection-y, -56px),
+        var(--surface-highlight), transparent 92%),
+      linear-gradient(132deg, var(--prism), transparent 25% 83%, var(--prism)),
+      color-mix(in srgb, var(--panel) var(--glass-opacity), transparent);
+  }
+  .liquid-glass.reflecting { --surface-highlight: color-mix(in srgb, var(--glint), white 10%); }
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .liquid-glass:not(select, #status) {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  }
+}
+.liquid-glass.reflecting:not(select, #status)::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(75px 47px at var(--reflection-x) var(--reflection-y), var(--prism), transparent);
+  filter: url("#refraction");
+  opacity: .45;
+}
+.shell { padding: 10px; column-gap: 9px; }
+.shell.collapsed { column-gap: 0; }
+aside.liquid-glass {
+  padding: 21px 14px max(16px, env(safe-area-inset-bottom));
+  border-radius: 22px;
+  min-width: 0;
+}
+.top.liquid-glass {
+  min-height: 56px;
+  padding: 5px 12px;
+  border-radius: 18px;
+}
+.top #chat-title { letter-spacing: -.022em; }
+.top #collapse { min-width: 44px; }
+#composer.liquid-glass {
+  border-radius: 23px;
+  padding: 8px;
+  transition: border-color 220ms var(--spring), box-shadow 220ms var(--spring);
+}
+#composer:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+  box-shadow: inset 0 1px 1px var(--glint), 0 0 0 3px var(--prism), 0 12px 30px var(--abyss);
+}
+#prompt { transition: height 160ms var(--spring); }
+#mode.liquid-glass { box-shadow: inset 0 1px 0 var(--glint); }
+#status.liquid-glass { border-radius: 99px; padding: 3px 9px; }
+#status:empty { display: none; }
+#usage { color: var(--muted); font-size: .72rem; margin: 4px 5px; line-height: 1.35; }
+#usage[data-near] { color: var(--ink); font-weight: 650; }
+.toolbar button { transition: background-color 170ms ease, transform 170ms var(--spring), color 170ms ease; }
+.dialog-actions { position: sticky; bottom: -24px; z-index: 1; padding-top: .55rem; }
+.welcome h1 { font-size: clamp(2.4rem, 5.5vw, 4.65rem); letter-spacing: -.055em; }
+.welcome p { max-width: 35ch; margin-inline: auto; }
+.messages { font-size: var(--chat-type); line-height: 1.64; }
+.messages article { min-width: 0; }
+.history button[aria-current="true"] { box-shadow: inset 2px 0 var(--accent); }
+:root[data-density="compact"] .messages { gap: 14px; }
+:root[data-density="compact"] .history { margin-top: 12px; }
+:root[data-rail="solid"] aside.liquid-glass { background: var(--side); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.table-scroll { overflow: auto; max-width: 100%; }
+.message table { width: 100%; border-collapse: collapse; }
+.message th, .message td { padding: .52rem .68rem; border-bottom: 1px solid var(--line); text-align: start; }
+.message th { font-weight: 650; background: var(--side); }
+.message .code-keyword { color: #5b37a9; font-weight: 620; }
+.message .code-string { color: #23604a; }
+.message .code-number { color: #895018; }
+.message .code-comment { color: var(--muted); font-style: italic; }
+:root[data-effective-theme="dark"] .code-keyword { color: #c8b9ff; }
+:root[data-effective-theme="dark"] .code-string { color: #a2dec8; }
+:root[data-effective-theme="dark"] .code-number { color: #ffcf9c; }
+.citation { font-size: .78em; margin-inline: .12em; }
+.personal-preview { display: flex; align-items: center; gap: .85rem; margin: .8rem 0 0; }
+.personal-preview .orb { --orb-size: 52px; }
+.voice-room { width: min(100% - 26px, 400px); text-align: center; }
+.voice-room.expanded { width: min(100% - 20px, 850px); min-height: min(72dvh, 580px); }
+.voice-room.expanded .orb-voice { --orb-size: clamp(110px, 26vh, 220px); }
+.voice-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .25rem; }
+.orb.orb-voice { --orb-size: 110px; margin-block: 1.25rem; }
+.voice-waves { display: flex; height: 30px; align-items: center; justify-content: center; gap: 6px; }
+.voice-waves i { height: 100%; width: 4px; border-radius: 8px; background: var(--orb-two); transform: scaleY(calc(.13 + var(--voice-level) * .67)); opacity: .75; }
+.voice-waves i:nth-child(2n) { transform: scaleY(calc(.13 + var(--voice-high, 0) * .8)); }
+.voice-waves i:nth-child(3) { transform: scaleY(calc(.13 + var(--voice-low, 0) * .86)); }
+.orb {
+  --orb-glimmer: .52;
+  transform: scale(calc(var(--orb-user-size) * var(--orb-scale)));
+  background: radial-gradient(ellipse at 27% 21%, #fffdfde6 0%, #f5edff74 18%, transparent 35%),
+    radial-gradient(ellipse at 72% 77%, #251949dc, transparent 55%),
+    radial-gradient(ellipse at 38% 51%, var(--orb-one) 0%, var(--orb-two) 76%);
+  box-shadow: inset 0 0 0 1px #fff9, inset 0 -9px 18px #22135169,
+    0 0 calc(35px * var(--orb-glow)) color-mix(in srgb, var(--orb-two) 42%, transparent);
+  transition: transform 320ms var(--spring), box-shadow 450ms ease;
+}
+.orb i { animation: liquid-wave calc(var(--orb-speed) * var(--orb-tempo)) var(--spring) infinite alternate; opacity: calc(var(--orb-detail) * .66); }
+.orb i:nth-child(2) { animation-name: liquid-cross; mix-blend-mode: screen; }
+.orb i:nth-child(3) { animation-name: liquid-wave; animation-direction: alternate-reverse; mix-blend-mode: screen; }
+.orb::before, .orb::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+.orb::before {
+  background: radial-gradient(ellipse at 25% 22%, white, #fff3 19%, transparent 31%);
+  opacity: var(--orb-glimmer);
+  animation: orbital-breathe 7s ease-in-out infinite;
+}
+.orb::after {
+  box-shadow: inset 2px 3px 6px #fff8, inset -2px -4px 8px #371f9a60;
+  opacity: .7;
+}
+@keyframes orbital-breathe { 50% { opacity: .19; transform: scale(.91) translate(3%, 3%); } }
+@keyframes liquid-wave { from { transform: rotate(-18deg) scale(.9) translate(-7%, 3%); } to { transform: rotate(129deg) scale(1.08) translate(9%, -4%); } }
+@keyframes liquid-cross { from { transform: rotate(95deg) scale(.73) translate(14%, -5%); } to { transform: rotate(-65deg) scale(1.15) translate(-9%, 4%); } }
+:root[data-orb-state="responding"] .orb::before { animation-duration: 1.8s; opacity: calc(.25 + var(--token-light, 0) * .68); }
+:root[data-orb-state="speaking"] { --orb-speed: 4s; --orb-scale: 1.07; }
+:root[data-orb-state="speaking"] .orb::before { animation-duration: 1.05s; }
+:root[data-orb-state="image"] .orb i { animation-name: liquid-cross; }
+:root[data-orb-state="error"] .orb { --orb-scale: .96; filter: saturate(.64); }
+:root[data-orb-style="intelligence"] .orb i { inset: 16%; border-radius: 29% 71% 62% 38%; }
+:root[data-orb-style="minimal"] .orb i { animation: none; }
+:root[data-orb-style="classic"] .orb i { animation-name: classic-breathe; }
+:root[data-orb-style="aurora"] .orb i:nth-child(2) { inset: 2%; }
+:root[data-paused] *, :root[data-paused] *::before, :root[data-paused] *::after { animation-play-state: paused !important; }
+@media (max-width: 760px) {
+  .shell { padding: 6px; row-gap: 0; }
+  aside.liquid-glass { padding-inline: 12px; }
+  .liquid-glass:not(select, #status) { -webkit-backdrop-filter: blur(min(10px, var(--glass-blur))); backdrop-filter: blur(min(10px, var(--glass-blur))); }
+  .top.liquid-glass { padding-inline: 2px 6px; }
+  .toolbar button, .toolbar select { font-size: .75rem; padding-inline: .36rem; }
+  .dialog-actions { bottom: -16px; }
+  .atmosphere::after { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass.reflecting::after { display: none; }
+}
+
+dialog.liquid-glass { position: fixed; }
+body > svg[aria-hidden] { position: absolute; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-effective-theme]) { --canvas: #151525; }
+}
+/* Keep the chat backdrop stationary so scrolling and the small orb do not
+   continuously invalidate the glass behind the composer and navigation. */
+:root[data-conversation] .atmosphere::before, :root[data-conversation] .atmosphere::after { animation: none; }
+:root[data-conversation] .top.liquid-glass, :root[data-conversation] aside.liquid-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+#image-preview.fullscreen {
+  width: 100dvw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right));
+}
+#image-preview.fullscreen #full-image {
+  width: 100%;
+  height: calc(100dvh - 72px);
+  max-height: none;
+}
+:root[data-conversation] #composer.liquid-glass:not(:focus-within) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-conversation][data-orb-state="idle"] .orb-small i,
+:root[data-conversation][data-orb-state="idle"] .orb-small::before {
+  animation: none;
+}

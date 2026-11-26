@@ -2,9 +2,11 @@ import { translations } from "./i18n.js";
 import { markdown, node, webUrl } from "./markdown.js";
 import { readReply } from "./stream.js";
 import { canImportLegacy, createProfile, profiles, unlock } from "./vault.js";
+import { prepareVision } from "./vision.js";
+import { glassPreferences, mountGlass } from "./glass.js";
 import { crop, setupStudio } from "./studio.js";
 import { accountHeaders, accountVault, api, avatarImage, setAccountScope, setupAdmin } from "./accounts.js";
-import { animate, endMeter, motionPreferences, motionState, startMeter } from "./motion.js";
+import { animate, endMeter, motionPreferences, motionState, startMeter, tokenLight, softError } from "./motion.js";
 
 const byId = id => document.getElementById(id);
 const prompt = byId("prompt");
@@ -18,13 +20,21 @@ const preferences = byId("preferences");
 const confirmDelete = byId("confirm");
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const deviceLanguage = navigator.language.toLowerCase().startsWith("da") ? "da" : "en";
+const visualDefaults = {
+  theme: "auto", accent: "ink", customAccent: "#526c83", orbOne: "#c7d8ff", orbTwo: "#7763cc",
+  orbStyle: "fluid", motionEnabled: true, motionIntensity: 65, ambience: true,
+  glassOpacity: 77, glassBlur: 17, orbGlow: 62, orbSpeed: 80, orbDetail: 75, orbSize: 100,
+  textSize: 16, density: "comfortable", rail: "glass",
+};
+const ranges = { glassOpacity: "glass-opacity", glassBlur: "glass-blur", orbGlow: "orb-glow",
+  orbSpeed: "orb-speed", orbDetail: "orb-detail", orbSize: "orb-size", textSize: "text-size", motionIntensity: "motion-intensity" };
 const defaults = () => ({
+  ...visualDefaults,
   language: deviceLanguage,
   personality: "", memory: "", memoryEnabled: false, aiName: "", instructions: "",
-  length: "balanced", style: "balanced", theme: "auto", accent: "ink", customAccent: "#526c83",
+  length: "balanced", style: "balanced",
   mode: "auto", collapsed: false, chats: [], active: null, images: [],
-  displayName: "", avatar: "", memories: [], orbOne: "#7db9a7", orbTwo: "#847ed5",
-  orbStyle: "fluid", motionEnabled: true, motionIntensity: 65,
+  displayName: "", avatar: "", memories: [],
 });
 const shell = document.querySelector(".shell");
 const profileDialog = byId("profiles");
@@ -36,9 +46,9 @@ const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
 const settingIds = {
   theme: "theme", accent: "accent", customAccent: "custom-accent", aiName: "ai-name", length: "response-length",
   style: "response-style", personality: "personality", instructions: "instructions", memory: "memory",
-  displayName: "display-name", orbStyle: "orb-style", orbOne: "orb-one", orbTwo: "orb-two",
+  displayName: "display-name", orbStyle: "orb-style", orbOne: "orb-one", orbTwo: "orb-two", density: "density", rail: "rail",
 };
-const modelNames = { instant: "Khat Instant", think: "Khat Think", pro: "Khat Pro", legacy: "Llama 3.3 70B" };
+const modelNames = { instant: "Khat Instant", think: "Khat Think", pro: "Khat Pro", legacy: "Llama 3.3 70B", instantClassic: "Llama 3.1 8B", thinkClassic: "Qwen3 30B" };
 let state = defaults();
 let labels = translations[state.language];
 let vault;
@@ -53,16 +63,55 @@ let optionsId;
 let editing;
 let pending;
 let recording;
+let cancelCapture;
 let speaking;
 let deleting;
 let files = [];
 let search = false;
 let loadingFiles = false;
 let notice = "";
+let dailyUsage;
+const voiceRoom = byId("voice-room");
+let voiceReply = false;
+
+function renderUsage() {
+  const target = byId("usage");
+  target.hidden = !dailyUsage;
+  if (!dailyUsage) return;
+  const { text = 0, image = 0, textLimit, imageLimit, estimatedNeurons, budget } = dailyUsage;
+  target.textContent = `${labels.dailyUsage} · ${labels.textLimit} ${text}/${textLimit} · ${labels.imageLimit} ${image}/${imageLimit} · ${labels.estimatedUsage} ${estimatedNeurons}/${budget}`;
+  const near = (textLimit > 0 && text >= textLimit * .8) || (imageLimit > 0 && image >= imageLimit * .8) || estimatedNeurons >= budget * .8;
+  target.toggleAttribute("data-near", near);
+  if (near) target.textContent += ` · ${labels.nearLimit}`;
+}
+
+async function refreshUsage() {
+  const session = vault;
+  if (!session?.account) return;
+  try {
+    const data = await api("/api/usage");
+    if (vault !== session) return;
+    dailyUsage = data;
+    renderUsage();
+  } catch {
+    // The generation endpoint still enforces quota if the readout is unavailable.
+  }
+}
+
+function voiceControls() {
+  const busy = Boolean(recording || pending || speaking);
+  byId("voice-listen").disabled = !Recognition || busy;
+  byId("voice-mute").disabled = !recording;
+  byId("voice-room-stop").disabled = !busy;
+  byId("voice-room-status").textContent = voiceRoom.open
+    ? (!Recognition ? labels.voiceUnsupported : speaking ? labels.speaking : labels[notice] || labels.voiceIdle)
+    : "";
+}
 
 function report(key = "") {
   notice = key;
   status.textContent = labels[key] ?? "";
+  voiceControls();
 }
 
 async function persist() {
@@ -76,13 +125,14 @@ async function persist() {
   }
 }
 
-function appearance() {
-  motionPreferences(state);
+function appearance(visual = state) {
+  glassPreferences(visual);
+  motionPreferences(visual);
   const root = document.documentElement;
-  root.dataset.theme = state.theme;
-  root.dataset.effectiveTheme = state.theme === "auto" ? (systemDark.matches ? "dark" : "light") : state.theme;
-  root.dataset.accent = state.accent;
-  const hex = /^#[0-9a-f]{6}$/i.test(state.customAccent) ? state.customAccent : "#526c83";
+  root.dataset.theme = visual.theme;
+  root.dataset.effectiveTheme = visual.theme === "auto" ? (systemDark.matches ? "dark" : "light") : visual.theme;
+  root.dataset.accent = visual.accent;
+  const hex = /^#[0-9a-f]{6}$/i.test(visual.customAccent) ? visual.customAccent : "#526c83";
   const luminance = [0.2126, 0.7152, 0.0722].reduce((sum, weight, index) => {
     const channel = parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
     return sum + weight * (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
@@ -125,6 +175,7 @@ function refreshIdentity() {
 
 function enterProfile(session) {
   vault = session;
+  dailyUsage = undefined;
   state = { ...defaults(), ...session.data };
   if (!Object.hasOwn(translations, state.language)) state.language = deviceLanguage;
   temporary = undefined;
@@ -145,6 +196,7 @@ function enterProfile(session) {
   byId("account-auth").close();
   renderLanguage();
   updateControls();
+  refreshUsage();
 }
 
 for (const form of [unlockForm, createForm]) {
@@ -185,10 +237,11 @@ byId("profile-language").addEventListener("click", () => {
   showProfiles(!createForm.hidden && unlockForm.hidden);
 });
 async function resetSession() {
-  recording?.abort();
+  cancelCapture?.();
   endMeter();
   stopSpeech();
   vault = undefined;
+  dailyUsage = undefined;
   setAccountScope(null);
   temporary = undefined;
   avatarDraft = undefined;
@@ -480,19 +533,32 @@ function stopSpeech() {
   const { button } = speaking;
   speaking = null;
   window.speechSynthesis.cancel();
-  button.textContent = labels.read;
-  button.setAttribute("aria-pressed", "false");
+  if (button) {
+    button.textContent = labels.read;
+    button.setAttribute("aria-pressed", "false");
+  }
+  motionState({ speaking: false });
+  voiceControls();
 }
 
 function speak(message, button) {
-  const wasSpeaking = speaking?.button === button;
+  const wasSpeaking = speaking && speaking.button === button;
   stopSpeech();
   if (wasSpeaking) return;
+  if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return report("speechFailed");
   const utterance = new SpeechSynthesisUtterance(message.content);
   utterance.lang = message.language === "da" ? "da-DK" : "en-US";
   speaking = { button, utterance };
-  button.textContent = labels.stopReading;
-  button.setAttribute("aria-pressed", "true");
+  if (button) {
+    button.textContent = labels.stopReading;
+    button.setAttribute("aria-pressed", "true");
+  }
+  utterance.onstart = () => {
+    if (speaking?.utterance === utterance) {
+      motionState({ speaking: true });
+      voiceControls();
+    }
+  };
   utterance.onend = () => {
     if (speaking?.utterance === utterance) stopSpeech();
   };
@@ -550,8 +616,8 @@ function messageElement(message, streamed = false, index = -1) {
     element.append(node("p", message.content));
     return element;
   }
-  element.append(markdown(message.content, labels, report));
-  if (message.sources?.length) {
+  element.append(markdown(message.content, labels, report, Array.isArray(message.sources) ? message.sources : []));
+  if (Array.isArray(message.sources) && message.sources.length) {
     const disclosure = node("details", undefined, "sources");
     disclosure.append(node("summary", labels.sources));
     const list = node("ol");
@@ -591,12 +657,16 @@ function renderMessages() {
   const chat = current();
   byId("welcome").hidden = Boolean(chat?.messages.length);
   stopSpeech();
+  document.documentElement.toggleAttribute("data-conversation", Boolean(chat?.messages.length));
   messages.replaceChildren(...(chat?.messages ?? []).map((message, index) => messageElement(message, false, index)));
   scrollToLatest();
 }
 
 function updateControls() {
   byId("activity").hidden = !pending;
+  byId("voice-room-open").disabled = Boolean(pending);
+  byId("composer-image").disabled = Boolean(pending);
+  voiceControls();
   timeline.setAttribute("aria-busy", String(Boolean(pending)));
   for (const id of ["mode", "lock", "studio-open", "temporary", "admin-open"]) byId(id).disabled = Boolean(pending);
   send.disabled = !prompt.value.trim() || loadingFiles;
@@ -636,15 +706,17 @@ function renderLanguage() {
   renderFiles();
   renderHistory();
   renderMessages();
+  renderUsage();
   report(notice);
 }
 
 function openChat(id) {
-  recording?.abort();
+  cancelCapture?.();
   temporary = undefined;
   byId("temporary").setAttribute("aria-pressed", "false");
   state.active = id;
   prompt.value = "";
+  fitPrompt();
   files = [];
   renderFiles();
   renderHistory();
@@ -657,7 +729,7 @@ function openChat(id) {
   if (window.matchMedia("(pointer: fine)").matches) prompt.focus();
 }
 
-systemDark.addEventListener("change", appearance);
+systemDark.addEventListener("change", () => appearance(preferences.open ? previewVisual() : state));
 byId("collapse").addEventListener("click", () => {
   state.collapsed = !state.collapsed;
   appearance();
@@ -707,7 +779,7 @@ byId("menu").addEventListener("click", () => {
   byId("menu").setAttribute("aria-expanded", String(open));
 });
 byId("language").addEventListener("click", () => {
-  recording?.abort();
+  cancelCapture?.();
   state.language = state.language === "da" ? "en" : "da";
   persist();
   renderLanguage();
@@ -743,7 +815,8 @@ byId("settings").addEventListener("click", () => {
   for (const [key, id] of Object.entries(settingIds)) byId(id).value = state[key];
   byId("memory-enabled").checked = state.memoryEnabled;
   byId("motion-enabled").checked = state.motionEnabled;
-  byId("motion-intensity").value = state.motionIntensity;
+  for (const [key, id] of Object.entries(ranges)) byId(id).value = state[key];
+  byId("ambience").checked = state.ambience;
   avatarDraft = state.avatar;
   byId("avatar-file").value = "";
   memoryDraft = state.memories.map(entry => ({ ...entry }));
@@ -760,7 +833,32 @@ byId("accent").addEventListener("change", event => {
   byId("custom-color").hidden = event.currentTarget.value !== "custom";
 });
 byId("clear-memory").addEventListener("click", () => { byId("memory").value = ""; });
+function previewVisual() {
+  const values = { ...state };
+  for (const key of Object.keys(visualDefaults)) {
+    const id = settingIds[key] ?? ranges[key];
+    if (id) values[key] = ranges[key] ? Number(byId(id).value) : byId(id).value;
+  }
+  values.motionEnabled = byId("motion-enabled").checked;
+  values.ambience = byId("ambience").checked;
+  return values;
+}
+preferences.addEventListener("input", event => {
+  const controls = [...Object.keys(visualDefaults).map(key => settingIds[key] ?? ranges[key]), "motion-enabled", "ambience"];
+  if (controls.includes(event.target.id)) appearance(previewVisual());
+});
+byId("reset-visual").addEventListener("click", () => {
+  for (const [key, value] of Object.entries(visualDefaults)) {
+    const id = settingIds[key] ?? ranges[key];
+    if (id) byId(id).value = value;
+  }
+  byId("motion-enabled").checked = visualDefaults.motionEnabled;
+  byId("ambience").checked = visualDefaults.ambience;
+  byId("custom-color").hidden = true;
+  appearance(previewVisual());
+});
 preferences.addEventListener("close", async () => {
+  appearance();
   if (preferences.returnValue === "deleteAccount") {
     byId("removal-status").textContent = "";
     byId("account-removal").showModal();
@@ -775,8 +873,8 @@ preferences.addEventListener("close", async () => {
   const session = vault;
   const values = Object.fromEntries(Object.entries(settingIds).map(([key, id]) => [key, byId(id).value.trim()]));
   const memoryEnabled = byId("memory-enabled").checked;
-  const motionEnabled = byId("motion-enabled").checked;
-  const motionIntensity = Number(byId("motion-intensity").value);
+  const visual = previewVisual();
+  const visualValues = Object.fromEntries(Object.keys(visualDefaults).map(key => [key, visual[key]]));
   const memories = memoryDraft.filter(entry => entry.content.trim()).map(entry => ({ ...entry, content: entry.content.trim() }));
   let avatar = avatarDraft ?? "";
   if (selected) {
@@ -785,7 +883,7 @@ preferences.addEventListener("close", async () => {
     finally { byId("avatar-file").value = ""; }
   }
   if (vault !== session) return;
-  state = { ...state, ...values, memoryEnabled, motionEnabled, motionIntensity, avatar, memories };
+  state = { ...state, ...values, ...visualValues, memoryEnabled, avatar, memories };
   refreshIdentity();
   appearance();
   renderMessages();
@@ -825,7 +923,10 @@ byId("upload").addEventListener("change", async event => {
   updateControls();
   const originalFiles = files;
   try {
+    const isImage = file => /\.(?:jpe?g|png|webp)$/i.test(file.name);
+    if (files.filter(file => file.vision).length + selected.filter(isImage).length > 1) throw new Error("invalidFile");
     const additions = await Promise.all(selected.map(async file => {
+      if (isImage(file) && file.name.length <= 160) return { name: file.name, vision: await prepareVision(file) };
       if (file.size > 48000 || file.name.length > 160 || !input.accept.split(",").some(ext => file.name.toLowerCase().endsWith(ext))) {
         throw new Error("invalidFile");
       }
@@ -836,7 +937,7 @@ byId("upload").addEventListener("change", async event => {
     if (originalFiles === files) {
       files = [...files, ...additions];
       renderFiles();
-      report();
+      report(additions.some(file => file.vision) ? "visionAttached" : "");
     }
   } catch {
     report("invalidFile");
@@ -846,45 +947,105 @@ byId("upload").addEventListener("change", async event => {
   }
 });
 
-byId("voice").addEventListener("click", event => {
+function listen(button, conversation = false) {
   if (recording) return recording.stop();
-  const button = event.currentTarget;
+  if (!Recognition || pending) return report("voiceUnsupported");
   const session = new Recognition();
+  let transcript = "";
+  let cancelled = false;
   recording = session;
+  cancelCapture = () => {
+    cancelled = true;
+    session.abort();
+  };
   session.lang = state.language === "da" ? "da-DK" : "en-US";
   const finish = () => {
     if (recording !== session) return;
     recording = null;
+    cancelCapture = undefined;
     motionState({ listening: false });
     endMeter();
     button.setAttribute("aria-pressed", "false");
-    if (notice === "listening") report();
+    if (["listening", "voiceStarting"].includes(notice)) report();
+    updateControls();
+    if (conversation && !cancelled && voiceRoom.open && transcript.trim()) {
+      voiceReply = true;
+      submitChat(transcript.trim()).finally(() => { voiceReply = false; });
+    }
+  };
+  session.onstart = () => {
+    if (recording !== session) return;
+    motionState({ listening: true });
+    button.setAttribute("aria-pressed", "true");
+    report("listening");
+    startMeter();
   };
   session.onresult = result => {
     if (recording !== session || pending) return;
     const text = result.results[result.resultIndex][0].transcript;
-    prompt.value = `${prompt.value.trim()} ${text}`.trim().slice(0, prompt.maxLength);
-    updateControls();
+    if (conversation) transcript = `${transcript} ${text}`.slice(0, 8000);
+    else {
+      prompt.value = `${prompt.value.trim()} ${text}`.trim().slice(0, prompt.maxLength);
+      fitPrompt();
+      updateControls();
+    }
   };
   session.onend = finish;
   session.onerror = event => {
     if (recording !== session) return;
+    cancelled = true;
     finish();
     if (event.error !== "aborted") report("voiceFailed");
   };
   try {
     session.start();
-    button.setAttribute("aria-pressed", "true");
-    report("listening");
-    motionState({ listening: true });
-    startMeter();
+    report("voiceStarting");
+    updateControls();
   } catch {
+    cancelled = true;
     finish();
     report("voiceFailed");
   }
+}
+byId("voice").addEventListener("click", event => listen(event.currentTarget));
+byId("voice-room-open").addEventListener("click", () => {
+  stopSpeech();
+  cancelCapture?.();
+  voiceRoom.showModal();
+  report();
+});
+byId("voice-listen").addEventListener("click", event => listen(event.currentTarget, true));
+byId("voice-mute").addEventListener("click", () => { cancelCapture?.(); endMeter(); });
+byId("voice-room-close").addEventListener("click", () => voiceRoom.close());
+byId("voice-room-stop").addEventListener("click", () => {
+  cancelCapture?.();
+  pending?.abort();
+  stopSpeech();
+});
+byId("voice-size").addEventListener("click", event => {
+  const expanded = voiceRoom.classList.toggle("expanded");
+  event.currentTarget.setAttribute("aria-pressed", String(expanded));
+  event.currentTarget.textContent = labels[expanded ? "compactVoice" : "expandVoice"];
+});
+window.addEventListener("pagehide", () => {
+  cancelCapture?.();
+  stopSpeech();
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden) cancelCapture?.(); });
+voiceRoom.addEventListener("close", () => {
+  voiceReply = false;
+  cancelCapture?.();
+  endMeter();
+  pending?.abort();
+  stopSpeech();
 });
 
-prompt.addEventListener("input", updateControls);
+function fitPrompt() {
+  prompt.style.height = "auto";
+  prompt.style.height = `${Math.min(170, Math.max(56, prompt.scrollHeight))}px`;
+}
+
+prompt.addEventListener("input", () => { fitPrompt(); updateControls(); });
 prompt.addEventListener("keydown", event => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing && window.matchMedia("(pointer: fine)").matches) {
     event.preventDefault();
@@ -907,15 +1068,23 @@ function modelHistory(entries, limit) {
 
 byId("composer").addEventListener("submit", event => {
   event.preventDefault();
-  submitChat(prompt.value.trim());
+  const content = prompt.value.trim();
+  const imageRequest = /^(?:please\s+)?(?:generate|create|draw|paint|make|generér|generer|lav|tegn|skab)\s+(?:me\s+)?(?:an?\s+|et\s+|en\s+)?(?:image|picture|illustration|painting|billede|tegning)(?:\s+(?:of|af|med))?\s*[:—-]?\s+(.+)$/i.exec(content);
+  if (imageRequest && !files.length) {
+    studio.open(imageRequest[1], Boolean(temporary));
+    return;
+  }
+  submitChat(content);
 });
 
 async function submitChat(content, replaceFrom = -1, regenerate = false) {
   if (!content || pending || loadingFiles || syncing) return;
-  recording?.abort();
+  cancelCapture?.();
   const controller = new AbortController();
   pending = controller;
   const attachments = replaceFrom < 0 ? files : [];
+  const vision = attachments.find(file => file.vision)?.vision;
+  const textFiles = attachments.filter(file => !file.vision);
   const previous = current();
   const chat = previous ?? { id: crypto.randomUUID(), title: content.replace(/\s+/g, " ").slice(0, 64), messages: [] };
   if (!previous) state.chats.unshift(chat);
@@ -941,16 +1110,17 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
   let paint = 0;
   let sources = [];
   let model;
+  let answer;
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...accountHeaders() },
       signal: controller.signal,
       body: JSON.stringify({
-        messages: modelHistory(chat.messages, 48000 - attachments.reduce((sum, file) => sum + file.text.length, 0)),
+        messages: modelHistory(chat.messages, 48000 - textFiles.reduce((sum, file) => sum + file.text.length, 0)),
         personality: state.personality, memory: state.memoryEnabled ? state.memory : "",
         aiName: state.aiName, instructions: state.instructions, style: state.style, length: state.length,
-        language: state.language, mode: state.mode, files: attachments, search, temporary: Boolean(temporary),
+        language: state.language, mode: state.mode, files: textFiles, ...(vision && { vision }), search, temporary: Boolean(temporary),
       }),
     });
     if (!response.ok) throw new Error((await response.json()).error ?? "modelFailed");
@@ -964,6 +1134,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
         motionState({ thinking: false, responding: true });
         animate(draft, [{ opacity: .58 }, { opacity: 1 }], 200);
       }
+      tokenLight(text.length - partial.length);
       partial = text;
       if (!paint) paint = requestAnimationFrame(() => {
         paint = 0;
@@ -972,7 +1143,8 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
         if (follow) scrollToLatest();
       });
     });
-    chat.messages.push({ role: "assistant", content: reply, sources, model, language: state.language });
+    answer = { role: "assistant", content: reply, sources, model, language: state.language };
+    chat.messages.push(answer);
     const learned = decodeURIComponent(response.headers.get("x-khat-memory") ?? "");
     if (vault?.account && !temporary && state.memoryEnabled && learned && state.memories.length < 40 &&
       !state.memories.some(entry => entry.content === learned)) {
@@ -993,6 +1165,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
         state.active = null;
       }
     }
+    if (!controller.signal.aborted) softError();
     report(controller.signal.aborted ? "stopped" : Object.hasOwn(labels, error.message) ? error.message : "modelFailed");
   } finally {
     if (paint) cancelAnimationFrame(paint);
@@ -1003,12 +1176,17 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
     renderMessages();
     renderFiles();
     updateControls();
-    if (window.matchMedia("(pointer: fine)").matches) prompt.focus();
+    fitPrompt();
+    if (voiceRoom.open && voiceReply && answer) speak(answer);
+    else if (!voiceRoom.open && window.matchMedia("(pointer: fine)").matches) prompt.focus();
+    refreshUsage();
   }
 }
 
-setupStudio({ state: () => state, labels: () => labels, persist, report, vault: () => vault });
+const studio = setupStudio({ state: () => state, labels: () => labels, persist, report, vault: () => vault, onUsage: refreshUsage });
 setupAdmin(() => labels);
+mountGlass();
+motionState({});
 renderLanguage();
 updateControls();
 initialize();

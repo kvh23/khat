@@ -4,6 +4,8 @@ let enabled = true;
 let active = {};
 let intensity = .65;
 let meter;
+let settle;
+let pulse;
 
 export function motionPreferences(state) {
   intensity = state.motionIntensity / 100;
@@ -19,7 +21,22 @@ export function motionPreferences(state) {
 export function motionState(change) {
   active = { ...active, ...change };
   root.dataset.orbState = active.image ? "image" : active.listening ? "listening" :
-    active.responding ? "responding" : active.thinking ? "thinking" : "idle";
+    active.responding ? "responding" : active.thinking ? "thinking" : active.speaking ? "speaking" : active.error ? "error" : "idle";
+}
+
+export function softError() {
+  clearTimeout(settle);
+  motionState({ error: true });
+  settle = setTimeout(() => motionState({ error: false }), 900);
+}
+
+export function tokenLight(length) {
+  if (!enabled || systemReduced.matches || document.hidden || pulse) return;
+  pulse = requestAnimationFrame(() => {
+    pulse = 0;
+    root.style.setProperty("--token-light", String(Math.min(1, .32 + length * .04)));
+    if (!active.responding) root.style.removeProperty("--token-light");
+  });
 }
 
 export function animate(element, keyframes, duration) {
@@ -35,7 +52,7 @@ export function endMeter() {
   cancelAnimationFrame(capture.frame);
   capture.stream?.getTracks().forEach(track => track.stop());
   capture.context?.close().catch(() => {});
-  root.style.setProperty("--voice-level", "0");
+  for (const key of ["level", "low", "high"]) root.style.setProperty(`--voice-${key}`, "0");
 }
 
 export async function startMeter() {
@@ -59,6 +76,7 @@ export async function startMeter() {
     await context.resume();
     if (meter !== capture) return;
     const samples = new Uint8Array(analyser.fftSize);
+    const frequencies = new Uint8Array(analyser.frequencyBinCount);
     let last = 0;
     let smoothed = 0;
     const tick = time => {
@@ -67,7 +85,15 @@ export async function startMeter() {
         analyser.getByteTimeDomainData(samples);
         const sum = samples.reduce((total, value) => total + ((value - 128) / 128) ** 2, 0);
         smoothed = smoothed * .75 + Math.min(1, Math.sqrt(sum / samples.length) * 5) * .25;
+        analyser.getByteFrequencyData(frequencies);
+        const average = (start, end) => {
+          let energy = 0;
+          for (let bin = start; bin < end; bin++) energy += frequencies[bin];
+          return energy / ((end - start) * 255);
+        };
         root.style.setProperty("--voice-level", smoothed.toFixed(3));
+        root.style.setProperty("--voice-low", average(1, 8).toFixed(3));
+        root.style.setProperty("--voice-high", average(8, 28).toFixed(3));
         last = time;
       }
       capture.frame = requestAnimationFrame(tick);

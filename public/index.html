@@ -8,9 +8,14 @@
   <title>Khat</title>
   <link rel="stylesheet" href="/khat.css">
   <link rel="stylesheet" href="/motion.css">
+  <link rel="stylesheet" href="/liquid.css">
   <script type="module" src="/chat.js"></script>
 </head>
 <body>
+  <div class="atmosphere" aria-hidden="true"></div>
+  <svg width="0" height="0" aria-hidden="true" focusable="false">
+    <filter id="refraction"><feTurbulence type="fractalNoise" baseFrequency=".026" numOctaves="1" result="grain"/><feDisplacementMap in="SourceGraphic" in2="grain" scale="4" xChannelSelector="R" yChannelSelector="G"/></filter>
+  </svg>
   <div class="shell" hidden>
     <aside id="sidebar" aria-label="Conversation history">
       <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span> Khat</div>
@@ -66,15 +71,18 @@
               <option value="think">Khat Think</option>
               <option value="pro">Khat Pro</option>
             </select>
-            <input id="upload" type="file" multiple accept=".txt,.md,.csv,.json,.log,.js,.ts,.py,.html,.css,.yaml,.yml,.xml" hidden>
+            <input id="upload" type="file" multiple accept=".txt,.md,.csv,.json,.log,.js,.ts,.py,.html,.css,.yaml,.yml,.xml,.jpg,.jpeg,.png,.webp" hidden>
             <button type="button" id="attach"><span aria-hidden="true">＋</span> <span data-label="attach">Attach</span></button>
             <button type="button" id="search" aria-pressed="false"><span aria-hidden="true">⌕</span> <span data-label="search">Search Wikipedia</span></button>
+            <button type="button" id="composer-image" data-label="studioTool">Studio</button>
+            <button type="button" id="voice-room-open" data-label="voiceRoom">Voice</button>
             <button type="button" id="voice" aria-pressed="false"><span data-label="voice">Dictate</span></button>
             <button id="send" class="send" type="submit" aria-label="Send" disabled><span aria-hidden="true">↑</span></button>
             <button id="stop" class="send" type="button" aria-label="Stop" hidden><span aria-hidden="true">■</span></button>
           </div>
         </form>
         <div class="response-status"><span id="activity" class="activity" hidden aria-hidden="true"></span><p id="status" role="status"></p></div>
+        <p id="usage" hidden></p>
       </footer>
     </main>
   </div>
@@ -103,10 +111,25 @@
         <legend data-label="motion">Motion</legend>
         <label class="check"><input type="checkbox" id="motion-enabled"> <span data-label="enableMotion">Enable animations</span></label>
         <label for="orb-style" data-label="orbStyle">Orb style</label>
-        <select id="orb-style"><option value="minimal">Minimal</option><option value="fluid">Fluid</option><option value="aurora">Aurora</option><option value="classic">Classic</option></select>
+        <select id="orb-style"><option value="minimal">Minimal</option><option value="fluid">Liquid</option><option value="intelligence">Intelligence</option><option value="aurora">Aurora</option><option value="classic">Classic</option></select>
         <label for="orb-one" data-label="orbOne">First orb color</label><input type="color" id="orb-one">
         <label for="orb-two" data-label="orbTwo">Second orb color</label><input type="color" id="orb-two">
         <label for="motion-intensity" data-label="motionIntensity">Animation intensity</label><input type="range" id="motion-intensity" min="0" max="100">
+      </fieldset>
+      <fieldset id="surface-controls">
+        <legend data-label="surfaceSettings">Glass and atmosphere</legend>
+        <div class="personal-preview"><div class="orb" aria-hidden="true"><i></i><i></i><i></i></div><span data-label="preview">Preview</span></div>
+        <label for="glass-opacity" data-label="glassOpacity">Glass opacity</label><input type="range" id="glass-opacity" min="65" max="100">
+        <label for="glass-blur" data-label="glassBlur">Glass blur</label><input type="range" id="glass-blur" min="0" max="24">
+        <label for="orb-glow" data-label="orbGlow">Orb glow</label><input type="range" id="orb-glow" min="0" max="100">
+        <label for="orb-speed" data-label="orbSpeed">Orb speed</label><input type="range" id="orb-speed" min="0" max="100">
+        <label for="orb-detail" data-label="orbDetail">Orb detail</label><input type="range" id="orb-detail" min="0" max="100">
+        <label for="orb-size" data-label="orbSize">Orb size</label><input type="range" id="orb-size" min="65" max="120">
+        <label for="text-size" data-label="textSize">Chat text size</label><input type="range" id="text-size" min="14" max="22">
+        <label for="density" data-label="density">Density</label><select id="density"><option value="comfortable" data-label="comfortable">Comfortable</option><option value="compact" data-label="compact">Compact</option></select>
+        <label for="rail" data-label="rail">Sidebar material</label><select id="rail"><option value="glass" data-label="glass">Glass</option><option value="solid" data-label="solid">Solid</option></select>
+        <label class="check"><input type="checkbox" id="ambience"> <span data-label="ambience">Atmospheric background</span></label>
+        <button type="button" id="reset-visual" data-label="resetVisual">Reset visual settings</button>
       </fieldset>
       <fieldset>
       <legend data-label="assistant">Assistant</legend>
@@ -115,7 +138,7 @@
       <label for="response-length" data-label="length">Response length</label>
       <select id="response-length"><option value="brief" data-label="brief">Brief</option><option value="balanced" data-label="balanced">Balanced</option><option value="detailed" data-label="detailed">Detailed</option></select>
       <label for="response-style" data-label="communication">Communication style</label>
-      <select id="response-style"><option value="balanced" data-label="balanced">Balanced</option><option value="direct" data-label="direct">Direct</option><option value="warm" data-label="warm">Warm</option><option value="formal" data-label="formal">Formal</option></select>
+      <select id="response-style"><option value="balanced" data-label="balanced">Balanced</option><option value="direct" data-label="direct">Direct</option><option value="warm" data-label="warm">Warm</option><option value="formal" data-label="formal">Formal</option><option value="professional" data-label="professional">professional</option><option value="creative" data-label="creative">creative</option><option value="mentor" data-label="mentor">mentor</option><option value="technical" data-label="technical">technical</option><option value="concise" data-label="concise">concise</option><option value="educational" data-label="educational">educational</option><option value="friendly" data-label="friendly">friendly</option></select>
       <label for="personality" data-label="personality">AI personality</label>
       <textarea id="personality" maxlength="1000" rows="3"></textarea>
       <label for="instructions" data-label="instructions">Custom instructions</label>
@@ -251,10 +274,17 @@
       <textarea id="image-prompt" name="prompt" maxlength="900" required rows="3"></textarea>
       <div class="studio-options">
         <div><label for="ratio" data-label="ratio">Aspect ratio</label>
-        <select id="ratio" name="ratio"><option value="square" data-label="square">Square</option><option value="portrait" data-label="portrait">Portrait</option><option value="landscape" data-label="landscape">Landscape</option></select></div>
+        <select id="ratio" name="ratio"><option value="square" data-label="square">Square</option><option value="portrait" data-label="portrait">Portrait</option><option value="landscape" data-label="landscape">Landscape</option><option value="wide">16:9</option><option value="tall">9:16</option></select></div>
         <div><label for="image-style" data-label="imageStyle">Image style</label>
-        <select id="image-style" name="style"><option value="plain" data-label="plain">None</option><option value="editorial" data-label="editorial">Editorial photo</option><option value="illustration" data-label="illustration">Illustration</option><option value="modern" data-label="modern">Scandinavian graphic</option></select></div>
+        <select id="image-style" name="style"><option value="plain" data-label="plain">None</option><option value="editorial" data-label="editorial">Editorial photo</option><option value="illustration" data-label="illustration">Illustration</option><option value="modern" data-label="modern">Scandinavian graphic</option><option value="photo" data-label="photo">photo</option><option value="cinema" data-label="cinema">cinema</option><option value="minimal" data-label="minimalStyle">minimalStyle</option><option value="architecture" data-label="architecture">architecture</option><option value="product" data-label="product">product</option><option value="digital" data-label="digital">digital</option><option value="abstract" data-label="abstractStyle">abstractStyle</option><option value="concept" data-label="concept">concept</option><option value="mono" data-label="mono">mono</option></select></div>
       </div>
+      <label for="image-quality" data-label="quality">Quality</label>
+      <select id="image-quality" name="quality">
+        <option value="draft" data-label="draftQuality">Draft · 2 steps</option>
+        <option value="balanced" data-label="balancedQuality" selected>Standard · 4 steps</option>
+        <option value="detail" data-label="detailQuality">Detailed · 8 steps</option>
+      </select>
+      <label class="check"><input type="checkbox" name="enhance" id="enhance-image"> <span data-label="enhanceImage">Enhance composition</span></label>
       <button id="generate" type="submit" class="primary" data-label="generate">Generate image</button>
       <div id="studio-skeleton" class="skeleton" aria-hidden="true" hidden></div>
     </form>
@@ -262,8 +292,21 @@
     <h3 data-label="imageHistory">Image history</h3>
     <div id="gallery"></div>
   </dialog>
+  <dialog id="voice-room" class="voice-room glass" aria-labelledby="voice-room-title">
+    <h2 id="voice-room-title" data-label="voiceRoom">Voice</h2>
+    <div class="orb orb-voice" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="voice-waves" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <p id="voice-room-status" role="status"></p>
+    <div class="voice-actions">
+      <button class="primary" type="button" id="voice-listen" data-label="listen">Listen</button>
+      <button type="button" id="voice-mute" data-label="mute" disabled>Mute</button>
+      <button type="button" id="voice-room-stop" data-label="stop" disabled>Stop</button>
+      <button type="button" id="voice-size" aria-pressed="false" data-label="expandVoice">Expand</button>
+      <button type="button" id="voice-room-close" data-label="close">Close</button>
+    </div>
+  </dialog>
   <dialog id="image-preview" aria-labelledby="preview-title">
-    <form method="dialog" class="dialog-header"><h2 id="preview-title" data-label="preview">Preview</h2><button data-label="close">Close</button></form>
+    <form method="dialog" class="dialog-header"><h2 id="preview-title" data-label="preview">Preview</h2><button id="image-fullscreen" type="button" aria-pressed="false" data-label="fullscreen">Full screen</button><button data-label="close">Close</button></form>
     <img id="full-image" alt="">
   </dialog>
 </body>
