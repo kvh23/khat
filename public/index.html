@@ -4,8 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Khat, your space to think.">
-  <title>Khat AI</title>
+  <meta name="description" content="A more personal approach to artificial intelligence. Thoughtfully designed for curious minds, creative thinking and everyday discovery.">
+  <title>Khat — Intelligence, reimagined.</title>
+  <link rel="canonical" href="https://khat.khat.workers.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Khat AI">
+  <meta property="og:title" content="Khat — Intelligence, reimagined.">
+  <meta property="og:description" content="A more personal approach to artificial intelligence. Thoughtfully designed for curious minds, creative thinking and everyday discovery.">
+  <meta property="og:url" content="https://khat.khat.workers.dev/">
+  <meta property="og:image" content="https://khat.khat.workers.dev/khat-social.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Khat AI — Intelligence, reimagined.">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Khat AI",
+      "alternateName": "Khat",
+      "url": "https://khat.khat.workers.dev/"
+    }
+  </script>
   <link rel="icon" href="/khat-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/khat.css">
   <link rel="stylesheet" href="/motion.css">
@@ -13,6 +32,13 @@
   <script type="module" src="/chat.js"></script>
 </head>
 <body>
+  <noscript>
+    <main class="public-brand-fallback">
+      <h1>Khat AI</h1>
+      <p>A more personal approach to artificial intelligence. Thoughtfully designed for curious minds, creative thinking and everyday discovery.</p>
+      <p>Enable JavaScript to sign in.</p>
+    </main>
+  </noscript>
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="shell" hidden>
     <aside id="sidebar" aria-label="Conversation history">
@@ -202,6 +228,7 @@
   <dialog id="account-auth" class="glass" aria-labelledby="account-title">
     <div class="orb orb-login" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1 id="account-title" data-label="accountWelcome">Your space to think.</h1>
+    <p data-label="brandDescription">A more personal approach to artificial intelligence. Thoughtfully designed for curious minds, creative thinking and everyday discovery.</p>
     <p data-label="accountIntro">Sign in to pick up your conversations on any device.</p>
     <form id="account-form">
       <label for="account-username" data-label="username">Username</label>

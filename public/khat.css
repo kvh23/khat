@@ -300,3 +300,5 @@ dialog .check { display: flex; align-items: center; gap: .45rem; }
 .toolbar > button { min-height: 44px; }
 .toolbar .send { flex: none; }
 #prompt { padding-inline: .9rem; line-height: 1.5; }
+
+.public-brand-fallback { display: block; max-width: 34rem; margin: 12vh auto; padding: 24px; }
