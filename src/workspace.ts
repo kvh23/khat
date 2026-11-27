@@ -1,3 +1,4 @@
+import { terms } from "./context";
 import type { Account } from "./accounts";
 
 type RecordValue = Record<string, unknown>;
@@ -118,9 +119,6 @@ const learned = [
 	{ phrase: /^(?:please )?remember (?:that )?i prefer (?:bullet points|lists)[.!]?$/i, content: "I prefer bullet points." },
 	{ phrase: /^(?:please )?remember (?:that )?i prefer (?:danish|english) (?:answers|replies)[.!]?$/i, content: "" },
 ];
-function terms(text: string) {
-	return new Set((text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(word => word.length >= 4));
-}
 
 export async function readPreferences(db: D1Database, owner: string) {
 	const workspace = await db.prepare("SELECT preferences FROM workspaces WHERE owner=?").bind(owner)

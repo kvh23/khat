@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculate, contextWindow } from "../src/context";
+import { calculate, contextWindow, documentContext } from "../src/context";
 import { publicStream } from "../src/public-stream";
 
 describe("bounded intelligence context", () => {
@@ -13,10 +13,22 @@ describe("bounded intelligence context", () => {
 		expect(result.summary).toEqual([{ role: "user", excerpt: "Remember the Saturn telescope." }]);
 	});
 
+	it("selects relevant numbered passages without cutting broad requests", () => {
+		const file = { name: "notes.txt", text: `${"unrelated text ".repeat(350)}\nSaturn telescope aperture is 100 mm.` };
+		const [result] = documentContext([file], "Find the telescope aperture");
+		expect(result).toMatchObject({ name: file.name, excerpts: [{ text: expect.stringContaining("100 mm") }] });
+		expect(documentContext([file], "Summarize everything")).toEqual([file]);
+	});
+
 	it("uses a bounded arithmetic parser with precedence and rejects unsafe or nonfinite expressions", () => {
 		expect(calculate("beregn: (2 + 3) × -4 ÷ 2")?.value).toBe(-10);
 		expect(calculate("2 + 3 * 4")?.value).toBe(14);
 		expect(calculate("Hvad er 2,5 × 4?")?.value).toBe(10);
+		expect(calculate("Beregn 12,5% af 80")?.value).toBe(10);
+		expect(calculate("2^3^2")?.value).toBe(512);
+		expect(calculate("-2^2")?.value).toBe(-4);
+		expect(calculate("sqrt(81) + 1/2")?.value).toBe(9.5);
+		expect(calculate("sqrt(-1)")).toBeNull();
 		expect(calculate("1/0")).toBeNull();
 		expect(calculate("Math.random()")).toBeNull();
 		expect(calculate("2(3 + 4)")).toBeNull();
