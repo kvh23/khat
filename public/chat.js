@@ -271,12 +271,6 @@ profileDialog.addEventListener("cancel", event => event.preventDefault());
 byId("toggle-create").addEventListener("click", () => {
   if (!profileDialog.dataset.busy) showProfiles(createForm.hidden);
 });
-byId("profile-language").addEventListener("click", () => {
-  if (profileDialog.dataset.busy) return;
-  state.language = uiLanguage === "da" ? "en" : "da";
-  renderLanguage();
-  showProfiles(!createForm.hidden && unlockForm.hidden);
-});
 async function resetSession() {
   cancelCapture?.();
   endMeter();
@@ -361,10 +355,6 @@ byId("account-auth").addEventListener("cancel", event => event.preventDefault())
 byId("account-toggle").addEventListener("click", () => {
   registering = !registering;
   accountForm();
-});
-byId("account-language").addEventListener("click", () => {
-  state.language = uiLanguage === "da" ? "en" : "da";
-  renderLanguage();
 });
 byId("account-form").addEventListener("submit", async event => {
   event.preventDefault();
@@ -812,7 +802,6 @@ function updateControls() {
   send.hidden = Boolean(pending);
   stop.hidden = !pending;
   prompt.disabled = Boolean(pending);
-  byId("language").disabled = Boolean(pending);
   byId("settings").disabled = Boolean(pending) || savingSettings;
   byId("search").disabled = Boolean(pending);
   byId("attach").disabled = Boolean(pending) || loadingFiles;
@@ -829,11 +818,6 @@ function renderLanguage() {
   document.querySelectorAll("[data-label]").forEach(element => {
     element.textContent = labels[element.dataset.label] ?? element.textContent;
   });
-  for (const id of ["language", "profile-language", "account-language"]) {
-    const language = byId(id);
-    language.textContent = uiLanguage === "da" ? "EN" : "DA";
-    language.setAttribute("aria-label", labels.switchLanguage);
-  }
   byId("lock").setAttribute("aria-label", vault?.account ? labels.signOut : labels.lock);
   accountForm();
   if (vault?.account) preferences.querySelector("[data-label=privacy]").textContent = labels.accountPrivacy;
@@ -955,12 +939,6 @@ byId("menu").addEventListener("click", () => {
   const open = byId("sidebar").classList.toggle("open");
   byId("menu").setAttribute("aria-expanded", String(open));
   labelIcon("menu", open ? labels.collapse : labels.expand);
-});
-byId("language").addEventListener("click", () => {
-  cancelCapture?.();
-  state.language = uiLanguage === "da" ? "en" : "da";
-  persist();
-  renderLanguage();
 });
 function renderMemoryDraft() {
   const entries = byId("memory-entries");

@@ -96,7 +96,6 @@ main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minm
   border-bottom: 1px solid var(--line);
 }
 #chat-title { font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.language { margin-inline-start: auto; font-size: .78rem; font-weight: 700; border-color: var(--line); min-width: 44px; }
 .menu { display: none; }
 #timeline { overflow: auto; display: flex; flex-direction: column; padding: 20px clamp(14px, 5vw, 44px); }
 #timeline:focus-visible { outline-offset: -3px; }

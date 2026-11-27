@@ -48,8 +48,7 @@
 :root[data-orb-style="aurora"] .orb i { inset: 6%; border-radius: 35% 65% 59% 41%; mix-blend-mode: screen; }
 :root[data-orb-style="classic"] .orb i { animation-name: classic-breathe; }
 @keyframes classic-breathe { 50% { opacity: .25; transform: scale(.84); } }
-.orb-small { --orb-size: 22px; margin-inline-start: auto; }
-.orb-small + .language { margin-inline-start: .3rem; }
+.orb-small { --orb-size: 22px; flex: none; margin-inline-start: auto; margin-inline-end: 4px; }
 .orb-hero { --orb-size: clamp(68px, 9vw, 102px); }
 .orb-login { --orb-size: 60px; }
 .orb-studio { --orb-size: 29px; margin-inline-start: auto; }

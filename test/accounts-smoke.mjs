@@ -235,6 +235,16 @@ try {
     await page.locator('#preferences [value="save"]').click();
     await page.locator("#preferences").waitFor({ state: "hidden" });
     assert.equal((await read(admin)).preferences.language, "da");
+    assert.equal(await page.locator("#language, #account-language, #profile-language").count(), 0);
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const header = await page.locator(".top").boundingBox();
+      const orb = await page.locator(".top .orb-small").boundingBox();
+      const heading = await page.locator(".conversation-heading").boundingBox();
+      assert.ok(orb.width >= 20 && orb.x >= heading.x + heading.width - 1);
+      assert.ok(header.x + header.width - (orb.x + orb.width) < 24);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.reload();
     await page.waitForFunction(() => document.documentElement.lang === "da");
     for (const width of [390, 768, 1440]) {
