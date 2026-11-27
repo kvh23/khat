@@ -28,7 +28,7 @@
   <link rel="icon" href="/khat-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/khat.css">
   <link rel="stylesheet" href="/motion.css">
-  <link rel="stylesheet" href="/liquid.css">
+  <link rel="stylesheet" href="/liquid.css?v=search-pill">
   <script type="module" src="/chat.js"></script>
 </head>
 <body>
@@ -107,13 +107,16 @@
             <button type="button" id="attach"><span aria-hidden="true">＋</span> <span data-label="attach">Attach</span></button>
             <label class="sr-only" for="search" data-label="search">Web research</label>
             <span id="search-disclosure" class="sr-only" data-label="searchDisclosure"></span>
-            <select id="search" aria-describedby="search-disclosure">
-              <option value="off" data-label="searchOff">Search off</option>
-              <option value="auto" data-label="searchAuto">Auto search</option>
-              <option value="quick" data-label="searchQuick">Quick search</option>
-              <option value="advanced" data-label="searchAdvanced">Advanced research</option>
-              <option value="deep" data-label="searchDeep">Deep research</option>
-            </select>
+            <div class="search-picker">
+              <select id="search" class="liquid-glass" aria-describedby="search-disclosure">
+                <option value="off" data-label="searchOff">Search off</option>
+                <option value="auto" data-label="searchAuto">Auto search</option>
+                <option value="quick" data-label="searchQuick">Quick search</option>
+                <option value="advanced" data-label="searchAdvanced">Advanced research</option>
+                <option value="deep" data-label="searchDeep">Deep research</option>
+              </select>
+              <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
             <button type="button" id="composer-image" data-label="studioTool">Studio</button>
             <button type="button" id="voice-room-open" data-label="voiceRoom">Voice</button>
             <button type="button" id="voice" aria-pressed="false"><span data-label="voice">Dictate</span></button>

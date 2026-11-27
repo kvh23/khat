@@ -230,16 +230,40 @@ dialog.liquid-glass { position: fixed; }
 }
 
 .model-picker { position: relative; min-width: 0; }
-#mode.liquid-glass, #search { border-radius: var(--radius-pill); }
+#mode.liquid-glass, #search { border-radius: var(--radius-pill); font-weight: 600; }
 #mode.liquid-glass {
   display: inline-flex;
   align-items: center;
   gap: .5rem;
   padding: .45rem .75rem;
-  font-weight: 600;
 }
 #mode .ui-icon { width: 14px; height: 14px; }
-#mode:hover, #mode[aria-expanded="true"] { background: var(--hover); }
+#mode:hover, #mode[aria-expanded="true"], #search:hover { background: var(--hover); }
+.search-picker { position: relative; min-width: 0; }
+#search {
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  max-width: 100%;
+  font-size: .81rem;
+  padding-inline: var(--space-3) calc(var(--space-3) + var(--space-2) + 14px);
+}
+.search-picker .ui-icon {
+  position: absolute;
+  inset-inline-end: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  #search { font-size: .75rem; }
+}
+@media (forced-colors: active) {
+  #search { appearance: auto; padding-inline-end: var(--space-3); }
+  .search-picker .ui-icon { display: none; }
+}
 #model-options {
   position: absolute;
   z-index: 4;
@@ -423,7 +447,7 @@ aside.liquid-glass { padding: var(--space-4) var(--space-3); }
 }
 .top.liquid-glass, aside.liquid-glass { box-shadow: var(--glass-standard); }
 #composer.liquid-glass { box-shadow: var(--glass-elevated); }
-#mode.liquid-glass { box-shadow: var(--glass-subtle); }
+#mode.liquid-glass, #search.liquid-glass { box-shadow: var(--glass-subtle); }
 .brand { font-weight: 720; letter-spacing: -.067em; }
 .brand img { flex: none; }
 #preferences > form { grid-template-rows: auto auto minmax(0, 1fr) auto; }
