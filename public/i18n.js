@@ -22,7 +22,7 @@ export const translations = {
     limited: "Too many requests. Try again in a minute.", unauthorized: "Reload to sign in again.",
     searchFailed: "Wikipedia search is unavailable. Try again or turn search off.",
     modelFailed: "Khat couldn’t finish the response. You can resend your message.",
-    unavailable: "Khat is temporarily unavailable.", switchLanguage: "Switch to Danish",
+    unavailable: "Khat is temporarily unavailable.",
     speechFailed: "Read aloud is unavailable.",
   },
   da: {
@@ -48,7 +48,7 @@ export const translations = {
     limited: "For mange forespørgsler. Prøv igen om et minut.", unauthorized: "Genindlæs siden for at logge ind igen.",
     searchFailed: "Wikipedia-søgning er utilgængelig. Prøv igen, eller slå søgning fra.",
     modelFailed: "Khat kunne ikke færdiggøre svaret. Du kan sende beskeden igen.",
-    unavailable: "Khat er midlertidigt utilgængelig.", switchLanguage: "Skift til engelsk",
+    unavailable: "Khat er midlertidigt utilgængelig.",
     speechFailed: "Oplæsning er utilgængelig.",
   },
 };
