@@ -17,8 +17,8 @@ function gate() {
 		},
 	} as unknown as DurableObjectState;
 	const worker = new UsageGate(state);
-	return async (kind: string, neurons = 1) => (await worker.fetch(new Request("https://internal/reserve", {
-		method: "POST", body: JSON.stringify({ kind, neurons }),
+	return async (kind: string, neurons = 1, owner = "test") => (await worker.fetch(new Request(kind === "search" ? "https://internal/search" : "https://internal/reserve", {
+		method: "POST", body: JSON.stringify({ kind, neurons, credits: neurons, owner }),
 	}))).status;
 }
 
@@ -46,4 +46,15 @@ describe("daily account quota", () => {
 		expect(await reserve("retry")).toBe(429);
 		expect(await reserve("image")).toBe(429);
 	});
+});
+
+it("reserves search credits atomically and resets them monthly", async () => {
+	vi.useFakeTimers();
+	vi.setSystemTime(new Date("2026-11-30T23:59:59Z"));
+	const reserve = gate();
+	const batch = await Promise.all(Array.from({ length: 61 }, () => reserve("search", 2)));
+	expect(batch.filter(status => status === 204)).toHaveLength(60);
+	expect(await reserve("search")).toBe(429);
+	vi.setSystemTime(new Date("2026-12-01T00:00:00Z"));
+	expect(await reserve("search")).toBe(204);
 });

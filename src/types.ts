@@ -9,6 +9,7 @@ export interface Env {
 	ACCOUNTS_REQUIRED?: string;
 	ASSETS: { fetch(request: Request): Promise<Response> };
 	KHAT_PASSWORD?: string;
+	TAVILY_API_KEY?: string;
 	AUTH_LIMIT: RateLimiter;
 	CHAT_LIMIT: RateLimiter;
 	USAGE: DurableObjectNamespace;

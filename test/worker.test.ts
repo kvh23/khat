@@ -151,6 +151,30 @@ describe("chat and sources", () => {
 		expect(JSON.stringify(run.mock.calls)).toContain("Capital city");
 	});
 
+	it("grounds a signed-in search and falls back when Tavily fails or the chat is temporary", async () => {
+		const f = fixture();
+		const prepare = (sql: string) => ({ bind: () => ({
+			first: async () => sql.includes("JOIN accounts") ? { id: "account-fixture" } : null,
+		}) });
+		Object.assign(f.env, { DB: { prepare }, PASSWORDS: {}, TAVILY_API_KEY: "fixture" });
+		const fetch = vi.fn(async (url: string | URL) => String(url).includes("tavily.com")
+			? Response.json({ results: [{ title: "Web result", url: "https://example.test/news", content: "Retrieved evidence" }] })
+			: Response.json({ query: { pages: [{ pageid: 1, title: "Wiki result", extract: "Fallback evidence" }] } }));
+		vi.stubGlobal("fetch", fetch);
+		const headers = { cookie: `__Host-khat_session=${"X".repeat(43)}`, "x-khat-account": "account-fixture" };
+		const body = { messages: [prompt], search: "quick" };
+		const live = await f.post(body, headers);
+		expect(live.headers.get("x-khat-search-provider")).toBe("tavily");
+		expect(decodeURIComponent(live.headers.get("x-khat-sources")!)).toContain("https://example.test/news");
+		expect(JSON.stringify(f.run.mock.calls)).toContain("Retrieved evidence");
+		fetch.mockResolvedValueOnce(new Response(null, { status: 429 }));
+		expect((await f.post(body, headers)).headers.get("x-khat-search-provider")).toBe("wikipedia");
+		fetch.mockClear();
+		expect((await f.post({ ...body, temporary: true }, headers)).headers.get("x-khat-search-provider")).toBe("wikipedia");
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(String(fetch.mock.calls[0][0])).toContain("wikipedia.org");
+	});
+
 	it("reports provider failures with generic errors", async () => {
 		const { post, run } = fixture();
 		vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 503 })));
