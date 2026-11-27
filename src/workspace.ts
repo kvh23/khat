@@ -6,7 +6,7 @@ const text = (value: unknown, max: number): value is string => typeof value === 
 const isObject = (value: unknown): value is RecordValue => !!value && typeof value === "object" && !Array.isArray(value);
 const memoryKinds = ["manual", "explicit"];
 const options: Record<string, string[]> = {
-	language: ["en", "da"], theme: ["auto", "light", "dark"], style: ["balanced", "direct", "warm", "formal", "professional", "creative", "mentor", "technical", "concise", "educational", "friendly"],
+	language: ["auto", "en", "da"], theme: ["auto", "light", "dark"], style: ["balanced", "direct", "warm", "formal", "professional", "creative", "mentor", "technical", "concise", "educational", "friendly"],
 	length: ["brief", "balanced", "detailed"], accent: ["ink", "blue", "green", "rose", "custom"],
 	mode: ["auto", "instant", "think", "pro"], orbStyle: ["minimal", "fluid", "aurora", "classic", "intelligence"],
 	density: ["comfortable", "compact"], rail: ["glass", "solid"],

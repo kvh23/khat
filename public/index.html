@@ -150,6 +150,8 @@
       <section id="appearance-settings" role="tabpanel" aria-labelledby="tab-appearance-settings" hidden>
       <fieldset>
         <legend data-label="appearance">Appearance</legend>
+        <label for="preferred-language" data-label="interfaceLanguage">Language</label>
+        <select id="preferred-language"><option value="auto" data-label="deviceLanguage">Automatic (device language)</option><option value="en" lang="en">English</option><option value="da" lang="da">Dansk</option></select>
         <label for="theme" data-label="theme">Theme</label>
         <select id="theme"><option value="auto" data-label="auto">Automatic</option><option value="light" data-label="light">Light</option><option value="dark" data-label="dark">Dark</option></select>
         <label for="accent" data-label="accent">Accent color</label>
@@ -160,7 +162,7 @@
         <legend data-label="motion">Motion</legend>
         <label class="check"><input type="checkbox" id="motion-enabled"> <span data-label="enableMotion">Enable animations</span></label>
         <label for="orb-style" data-label="orbStyle">Orb style</label>
-        <select id="orb-style"><option value="minimal">Minimal</option><option value="fluid">Liquid</option><option value="intelligence">Intelligence</option><option value="aurora">Aurora</option><option value="classic">Classic</option></select>
+        <select id="orb-style"><option value="minimal" data-label="orb_minimal">Minimal</option><option value="fluid" data-label="orb_fluid">Liquid</option><option value="intelligence" data-label="orb_intelligence">Intelligence</option><option value="aurora" data-label="orb_aurora">Aurora</option><option value="classic" data-label="orb_classic">Classic</option></select>
         <label for="orb-one" data-label="orbOne">First orb color</label><input type="color" id="orb-one">
         <label for="orb-two" data-label="orbTwo">Second orb color</label><input type="color" id="orb-two">
         <label for="motion-intensity" data-label="motionIntensity">Animation intensity</label><div class="settings-slider"><input type="range" id="motion-intensity" min="0" max="100"><output for="motion-intensity"></output></div>

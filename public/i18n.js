@@ -255,3 +255,33 @@ Object.assign(translations.da, {
   confirmClearMemory: "Vil du rydde alle minder? Ændringen træder i kraft, når du vælger Gem.",
   instructionExample: "Eksempel: Svar på dansk, og forklar ukendte fagudtryk.",
 });
+
+Object.assign(translations.en, {
+  interfaceLanguage: "Language", deviceLanguage: "Automatic (device language)",
+  orb_minimal: "Minimal", orb_fluid: "Liquid", orb_intelligence: "Intelligence",
+  orb_aurora: "Aurora", orb_classic: "Classic",
+});
+Object.assign(translations.da, {
+  interfaceLanguage: "Sprog", deviceLanguage: "Automatisk (enhedens sprog)",
+  orb_minimal: "Minimal", orb_fluid: "Flydende", orb_intelligence: "Intelligens",
+  orb_aurora: "Nordlys", orb_classic: "Klassisk",
+});
+for (const [key, english] of Object.entries(translations.en)) {
+  translations.da[key] ??= english;
+}
+
+export function resolveLanguage(preference, device) {
+  if (preference === "da" || preference === "en") return preference;
+  return /^da(?:-|$)/i.test(device) ? "da" : "en";
+}
+
+// This only supplies a search and speech hint. The model follows the message itself.
+export function conversationLanguage(text, history = []) {
+  for (const sample of [text, ...history.filter(turn => turn.role === "user").slice(-3).reverse().map(turn => turn.content)]) {
+    const words = sample.toLowerCase().match(/[\p{L}]+/gu) ?? [];
+    const danish = words.filter(word => /[æøå]|^(jeg|du|ikke|hvad|hvem|hvorfor|hvordan|forklar|dansk|kan|det|er|og|skriv|hej)$/.test(word)).length;
+    const english = words.filter(word => /^(i|you|the|what|who|why|how|explain|english|can|it|is|and|write|hello)$/.test(word)).length;
+    if (danish !== english) return danish > english ? "da" : "en";
+  }
+  return "en";
+}

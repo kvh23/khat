@@ -1,5 +1,5 @@
 import { welcomeCopy } from "./welcome.js";
-import { translations } from "./i18n.js";
+import { resolveLanguage, conversationLanguage, translations } from "./i18n.js";
 import { markdown, node, webUrl } from "./markdown.js";
 import { readReply } from "./stream.js";
 import { canImportLegacy, createProfile, profiles, unlock } from "./vault.js";
@@ -22,7 +22,7 @@ const modelButton = byId("mode");
 const modelOptions = byId("model-options");
 const confirmDelete = byId("confirm");
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const deviceLanguage = navigator.language.toLowerCase().startsWith("da") ? "da" : "en";
+const deviceLanguage = () => resolveLanguage("auto", navigator.language);
 const visualDefaults = {
   theme: "auto", accent: "ink", customAccent: "#526c83", orbOne: "#c7d8ff", orbTwo: "#7763cc",
   orbStyle: "fluid", motionEnabled: true, motionIntensity: 65, ambience: true,
@@ -33,7 +33,7 @@ const ranges = { glassOpacity: "glass-opacity", glassBlur: "glass-blur",
   textSize: "text-size", motionIntensity: "motion-intensity" };
 const defaults = () => ({
   ...visualDefaults,
-  language: deviceLanguage,
+  language: "auto",
   personality: "", memory: "", memoryEnabled: false, aiName: "", instructions: "",
   length: "balanced", style: "balanced",
   mode: "auto", collapsed: false, chats: [], active: null, images: [],
@@ -47,7 +47,7 @@ const conversationOptions = byId("conversation-options");
 const editDialog = byId("edit-dialog");
 const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
 const settingIds = {
-  theme: "theme", accent: "accent", customAccent: "custom-accent", length: "response-length",
+  theme: "theme", accent: "accent", customAccent: "custom-accent", language: "preferred-language", length: "response-length",
   style: "response-style", instructions: "instructions", memory: "memory",
   displayName: "display-name", orbStyle: "orb-style", orbOne: "orb-one", orbTwo: "orb-two", rail: "rail",
 };
@@ -63,7 +63,8 @@ let previewFrame = 0;
 let appliedVisual;
 const modelNames = { instant: "Khat Instant", think: "Khat Think", pro: "Khat Pro", legacy: "Llama 3.3 70B", instantClassic: "Llama 3.1 8B", thinkClassic: "Qwen3 30B" };
 let state = defaults();
-let labels = translations[state.language];
+let uiLanguage = deviceLanguage();
+let labels = translations[uiLanguage];
 let vault;
 let accountsMode = false;
 let registering = false;
@@ -214,7 +215,7 @@ function enterProfile(session) {
   vault = session;
   dailyUsage = undefined;
   state = { ...defaults(), ...session.data };
-  if (!Object.hasOwn(translations, state.language)) state.language = deviceLanguage;
+  if (!["auto", "da", "en"].includes(state.language)) state.language = "auto";
   temporary = undefined;
   refreshIdentity();
   byId("account-preferences").hidden = byId("account-memories").hidden = !session.account;
@@ -272,7 +273,7 @@ byId("toggle-create").addEventListener("click", () => {
 });
 byId("profile-language").addEventListener("click", () => {
   if (profileDialog.dataset.busy) return;
-  state.language = state.language === "da" ? "en" : "da";
+  state.language = uiLanguage === "da" ? "en" : "da";
   renderLanguage();
   showProfiles(!createForm.hidden && unlockForm.hidden);
 });
@@ -362,7 +363,7 @@ byId("account-toggle").addEventListener("click", () => {
   accountForm();
 });
 byId("account-language").addEventListener("click", () => {
-  state.language = state.language === "da" ? "en" : "da";
+  state.language = uiLanguage === "da" ? "en" : "da";
   renderLanguage();
 });
 byId("account-form").addEventListener("submit", async event => {
@@ -774,7 +775,7 @@ function renderMessages(follow = true) {
   byId("welcome").hidden = Boolean(turns.length);
   document.documentElement.toggleAttribute("data-conversation", Boolean(turns.length));
   let prefix = 0;
-  if (renderOwner === chat && renderLanguageId === state.language) {
+  if (renderOwner === chat && renderLanguageId === uiLanguage) {
     while (prefix < turns.length && turns[prefix] === rendered[prefix]) prefix++;
   }
   if (messages.children.length > prefix) {
@@ -792,7 +793,7 @@ function renderMessages(follow = true) {
   }
   for (const button of messages.querySelectorAll(".message-actions button")) button.disabled = Boolean(pending);
   renderOwner = chat;
-  renderLanguageId = state.language;
+  renderLanguageId = uiLanguage;
   rendered = turns.slice();
   if (follow) {
     atBottom = true;
@@ -819,22 +820,27 @@ function updateControls() {
 }
 
 function renderLanguage() {
-  labels = translations[state.language];
-  document.documentElement.lang = state.language;
+  const preference = preferences.open ? byId("preferred-language").value : state.language;
+  uiLanguage = resolveLanguage(preference, navigator.language);
+  labels = translations[uiLanguage];
+  document.documentElement.lang = uiLanguage;
   renderModel();
   labelIcon("preferences-close", labels.close);
   document.querySelectorAll("[data-label]").forEach(element => {
-    element.textContent = labels[element.dataset.label];
+    element.textContent = labels[element.dataset.label] ?? element.textContent;
   });
   for (const id of ["language", "profile-language", "account-language"]) {
     const language = byId(id);
-    language.textContent = state.language === "da" ? "EN" : "DA";
+    language.textContent = uiLanguage === "da" ? "EN" : "DA";
     language.setAttribute("aria-label", labels.switchLanguage);
   }
   byId("lock").setAttribute("aria-label", vault?.account ? labels.signOut : labels.lock);
   accountForm();
   if (vault?.account) preferences.querySelector("[data-label=privacy]").textContent = labels.accountPrivacy;
   byId("history-search").placeholder = labels.searchHistory;
+  preferences.querySelector("[data-settings-nav]").setAttribute("aria-label", labels.settings);
+  byId("invite-code").setAttribute("aria-label", labels.invite);
+  if (preferences.open) renderMemoryDraft();
   renderWelcome();
   labelIcon("archives", labels.archive);
   labelIcon("menu", byId("menu").getAttribute("aria-expanded") === "true" ? labels.collapse : labels.expand);
@@ -952,7 +958,7 @@ byId("menu").addEventListener("click", () => {
 });
 byId("language").addEventListener("click", () => {
   cancelCapture?.();
-  state.language = state.language === "da" ? "en" : "da";
+  state.language = uiLanguage === "da" ? "en" : "da";
   persist();
   renderLanguage();
 });
@@ -1043,6 +1049,7 @@ function queueVisualPreview() {
   });
 }
 
+byId("preferred-language").addEventListener("change", renderLanguage);
 const settingsNav = preferences.querySelector("[data-settings-nav]");
 const settingsTabs = [...settingsNav.querySelectorAll("[role=tab]")];
 const settingsButtons = [...preferences.querySelectorAll("button[type=submit]")];
@@ -1099,7 +1106,7 @@ preferences.addEventListener("close", async () => {
   previewObserver.unobserve(settingsOrb);
   settingsOrb.removeAttribute("data-visible");
   document.documentElement.removeAttribute("data-settings-open");
-  if (preferences.returnValue !== "save") appearance();
+  if (preferences.returnValue !== "save") renderLanguage();
   if (preferences.returnValue === "deleteAccount") {
     byId("removal-status").textContent = "";
     byId("account-removal").showModal();
@@ -1147,7 +1154,7 @@ preferences.querySelector("form").addEventListener("submit", async event => {
     state = next;
     refreshIdentity();
     preferences.close("save");
-    appearance();
+    renderLanguage();
     report("saved");
   } catch (error) {
     fail(error.message);
@@ -1171,7 +1178,7 @@ confirmDelete.addEventListener("close", () => {
 });
 
 function renderWelcome() {
-  const { heading, subtitle, suggestions } = welcomeCopy(state.language, temporary ? "" : state.displayName);
+  const { heading, subtitle, suggestions } = welcomeCopy(uiLanguage, temporary ? "" : state.displayName);
   byId("welcome").querySelector("h1").textContent = heading;
   byId("welcome-intro").textContent = subtitle;
   const container = byId("welcome").querySelector(".suggestions");
@@ -1237,7 +1244,7 @@ function listen(button, conversation = false) {
     cancelled = true;
     session.abort();
   };
-  session.lang = state.language === "da" ? "da-DK" : "en-US";
+  session.lang = uiLanguage === "da" ? "da-DK" : "en-US";
   const finish = () => {
     if (recording !== session) return;
     recording = null;
@@ -1379,6 +1386,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
   if (!previous) state.chats.unshift(chat);
   if (!temporary) state.active = chat.id;
   const previousMessages = chat.messages.slice();
+  const messageLanguage = conversationLanguage(content, replaceFrom < 0 ? previousMessages : previousMessages.slice(0, replaceFrom));
   if (replaceFrom >= 0) chat.messages.length = replaceFrom;
   chat.messages.push(regenerate ? previousMessages[replaceFrom] : {
     role: "user", content, files: attachments.map(file => file.name),
@@ -1411,7 +1419,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
           personality: state.personality, memory: state.memoryEnabled ? state.memory : "",
           instructions: state.instructions, style: state.style, length: state.length,
         }),
-        language: state.language, mode: state.mode, files: textFiles, ...(vision && { vision }), search, temporary: Boolean(temporary),
+        language: messageLanguage, mode: state.mode, files: textFiles, ...(vision && { vision }), search, temporary: Boolean(temporary),
       }),
     });
     if (!response.ok) throw new Error((await response.json()).error ?? "modelFailed");
@@ -1433,7 +1441,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
         if (atBottom) scrollToLatest();
       });
     }, response.headers.get("x-khat-stream-filtered") === "1");
-    answer = { role: "assistant", content: reply, sources, model, language: state.language };
+    answer = { role: "assistant", content: reply, sources, model, language: messageLanguage };
     chat.messages.push(answer);
     const learned = decodeURIComponent(response.headers.get("x-khat-memory") ?? "");
     if (vault?.account && !temporary && state.memoryEnabled && learned && state.memories.length < 40 &&
@@ -1443,7 +1451,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
     report(response.headers.get("x-khat-fallback") === "true" ? "fallback" : "");
   } catch (error) {
     if (controller.signal.aborted && partial.trim()) {
-      chat.messages.push({ role: "assistant", content: partial, sources, model, language: state.language });
+      chat.messages.push({ role: "assistant", content: partial, sources, model, language: messageLanguage });
     } else {
       chat.messages = previousMessages;
       if (replaceFrom < 0) {
