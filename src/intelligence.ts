@@ -18,8 +18,8 @@ export function modelOrder(mode: Mode, prompt: string, contextSize: number, lang
 	const selected = mode === "auto" ? automatic(prompt, contextSize) : mode;
 	if (mode === "auto") {
 		if (selected === "pro") return ["pro", "think", "instant", "legacy"];
-		if (selected === "think") return ["think", "instant", "legacy"];
-		if (language === "da") return ["thinkClassic", "instant", "legacy"];
+		if (selected === "think") return ["think", "thinkClassic", "instant", "legacy"];
+		if (language === "da" || /[æøå]|(?:^|\s)(?:hvem|hvad|hvordan|hvorfor|forklar|skriv)(?=\s|[?!.,]|$)/i.test(prompt)) return ["thinkClassic", "instant", "legacy"];
 	}
 	if (selected === "pro") return ["pro", "legacy", "instant"];
 	if (selected === "think") return ["think", "legacy", "instant"];
@@ -31,6 +31,8 @@ export function modelOrder(mode: Mode, prompt: string, contextSize: number, lang
 
 function automatic(prompt: string, contextSize: number): Model {
 	if (contextSize >= 3500) return "pro";
+	if (/```|\b(?:typescript|javascript|python|sql|stack trace|tidskompleksitet|fejlbesked|procentregning|ligninger|afledte|integral|sandsynlighed|probability)\b/i.test(prompt) ||
+		/\d\s*[+*×÷/]\s*[(-]?\s*\d/.test(prompt)) return "think";
 	if (/\b(reason|prove|proof|analy[sz]e|debug|derive|compare|algorithm|refactor|math|ligning|beregn|debugging|bevis|analysér?|fejlfind|sammenlign)\b/i.test(prompt)) return "think";
 	return "instant";
 }

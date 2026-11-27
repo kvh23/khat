@@ -10,12 +10,13 @@ describe("bounded intelligence context", () => {
 		const result = contextWindow([...earlier, ...filler, latest]);
 		expect(result.recent).toHaveLength(6);
 		expect(result.recent.at(-1)).toEqual(latest);
-		expect(result.summary.some(item => item.excerpt.includes("Saturn telescope"))).toBe(true);
+		expect(result.summary).toEqual([{ role: "user", excerpt: "Remember the Saturn telescope." }]);
 	});
 
 	it("uses a bounded arithmetic parser with precedence and rejects unsafe or nonfinite expressions", () => {
 		expect(calculate("beregn: (2 + 3) × -4 ÷ 2")?.value).toBe(-10);
 		expect(calculate("2 + 3 * 4")?.value).toBe(14);
+		expect(calculate("Hvad er 2,5 × 4?")?.value).toBe(10);
 		expect(calculate("1/0")).toBeNull();
 		expect(calculate("Math.random()")).toBeNull();
 		expect(calculate("2(3 + 4)")).toBeNull();

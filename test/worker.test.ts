@@ -167,6 +167,8 @@ describe("model routing and quota", () => {
 		["think", "Tell me about Copenhagen", "@cf/zai-org/glm-4.7-flash", "think"],
 		["pro", "Tell me about Copenhagen", "@cf/google/gemma-4-26b-a4b-it", "pro"],
 		["auto", "Explain Copenhagen", "@cf/ibm-granite/granite-4.0-h-micro", "instant"],
+		["auto", "Hvad hedder du?", "@cf/qwen/qwen3-30b-a3b-fp8", "thinkClassic"],
+		["auto", "Hvorfor fejler min JavaScript-funktion?", "@cf/zai-org/glm-4.7-flash", "think"],
 		["auto", "Compare two ways to solve this", "@cf/zai-org/glm-4.7-flash", "think"],
 		["auto", "x".repeat(3500), "@cf/google/gemma-4-26b-a4b-it", "pro"],
 	])("routes %s to a real model", async (mode, content, id, served) => {
