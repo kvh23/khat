@@ -107,6 +107,7 @@ Object.assign(translations.da, {
 
 Object.assign(translations.en, {
   accountPrivacy: "Chats and preferences sync to your account. Relevant messages, opted-in memories, and attachments are sent to Workers AI. Wikipedia receives the search query when enabled.",
+  brandDescription: "A more personal approach to artificial intelligence. Thoughtfully designed for curious minds, creative thinking and everyday discovery.",
   accountWelcome: "Your space to think.", accountIntro: "Sign in to pick up your conversations on any device.",
   registerTitle: "Make it yours.", username: "Username", accountPassword: "Password", invite: "Invitation code",
   signIn: "Sign in", register: "Use an invitation", createAccount: "Create account", signOut: "Sign out",
@@ -132,6 +133,7 @@ Object.assign(translations.en, {
 
 Object.assign(translations.da, {
   accountPrivacy: "Samtaler og indstillinger synkroniseres med din konto. Relevante beskeder, aktiverede minder og filer sendes til Workers AI. Wikipedia modtager søgningen, når den er slået til.",
+  brandDescription: "En mere personlig tilgang til kunstig intelligens. Skabt med omtanke til nysgerrige mennesker, kreativ tænkning og hverdagens opdagelser.",
   accountWelcome: "Dit sted at tænke.", accountIntro: "Log ind for at fortsætte dine samtaler på alle dine enheder.",
   registerTitle: "Gør Khat til dit.", username: "Brugernavn", accountPassword: "Adgangskode", invite: "Invitationskode",
   signIn: "Log ind", register: "Brug en invitation", createAccount: "Opret konto", signOut: "Log ud",
