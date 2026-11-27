@@ -82,7 +82,7 @@ let cancelCapture;
 let speaking;
 let deleting;
 let files = [];
-let search = false;
+
 let loadingFiles = false;
 let notice = "";
 let dailyUsage;
@@ -228,8 +228,8 @@ function enterProfile(session) {
   renderModel();
   byId("history-search").value = "";
   byId("archives").setAttribute("aria-pressed", "false");
-  byId("search").setAttribute("aria-pressed", "false");
-  archives = search = false;
+  byId("search").value = "off";
+  archives = false;
   report();
   shell.hidden = false;
   profileDialog.close();
@@ -721,7 +721,7 @@ function messageElement(message, streamed = false, index = -1) {
     for (const source of message.sources) {
       const href = webUrl(source?.url);
       if (!href) continue;
-      const link = node("a", source.title);
+      const link = node("a", [source.title, new URL(href).hostname, source.date].filter(Boolean).join(" · "));
       link.href = href;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
@@ -835,6 +835,7 @@ function renderLanguage() {
   send.setAttribute("aria-label", labels.send);
   stop.setAttribute("aria-label", labels.stop);
   byId("voice").title = Recognition ? labels.voice : labels.voiceUnsupported;
+  byId("search").title = labels.searchDisclosure;
   byId("image-prompt").placeholder = labels.imagePlaceholder;
   byId("instructions").placeholder = labels.instructionExample;
   prompt.placeholder = `${labels.prompt}…`;
@@ -1172,10 +1173,6 @@ function renderWelcome() {
     return button;
   }));
 }
-byId("search").addEventListener("click", event => {
-  search = !search;
-  event.currentTarget.setAttribute("aria-pressed", String(search));
-});
 byId("attach").addEventListener("click", () => byId("upload").click());
 byId("upload").addEventListener("change", async event => {
   const input = event.currentTarget;
@@ -1397,7 +1394,7 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
           personality: state.personality, memory: state.memoryEnabled ? state.memory : "",
           instructions: state.instructions, style: state.style, length: state.length,
         }),
-        language: messageLanguage, mode: state.mode, files: textFiles, ...(vision && { vision }), search, temporary: Boolean(temporary),
+        language: messageLanguage, mode: state.mode, files: textFiles, ...(vision && { vision }), search: byId("search").value, temporary: Boolean(temporary),
       }),
     });
     if (!response.ok) throw new Error((await response.json()).error ?? "modelFailed");
@@ -1426,7 +1423,8 @@ async function submitChat(content, replaceFrom = -1, regenerate = false) {
       !state.memories.some(entry => entry.content === learned)) {
       state.memories.push({ id: crypto.randomUUID(), content: learned, source: "explicit" });
     }
-    report(response.headers.get("x-khat-fallback") === "true" ? "fallback" : "");
+    report(response.headers.get("x-khat-fallback") === "true" ? "fallback" :
+      response.headers.get("x-khat-search-provider") === "wikipedia" ? "wikiFallback" : "");
   } catch (error) {
     if (controller.signal.aborted && partial.trim()) {
       chat.messages.push({ role: "assistant", content: partial, sources, model, language: messageLanguage });

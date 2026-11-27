@@ -12,6 +12,22 @@ export class UsageGate {
 
 	async fetch(request: Request): Promise<Response> {
 		const day = new Date().toISOString().slice(0, 10);
+		if (new URL(request.url).pathname === "/search") {
+			const { owner, credits } = await request.json<{ owner: string; credits: number }>();
+			if (!owner || ![1, 2].includes(credits)) return new Response(null, { status: 400 });
+			const accepted = await this.state.storage.transaction(async tx => {
+				const month = day.slice(0, 7);
+				const stored = await tx.get<{ month: string; total: number; users: Record<string, number> }>("search");
+				const usage = stored?.month === month ? stored : { month, total: 0, users: {} };
+				const used = usage.users[owner] ?? 0;
+				if (used + credits > 120 || usage.total + credits > 800) return false;
+				usage.users[owner] = used + credits;
+				usage.total += credits;
+				await tx.put("search", usage);
+				return true;
+			});
+			return new Response(null, { status: accepted ? 204 : 429 });
+		}
 		if (new URL(request.url).pathname === "/stats") {
 			const stats = await this.state.storage.get<Usage>("usage");
 			return Response.json(stats?.day === day ? stats : { day, text: 0, image: 0, neurons: 0, users: {} });

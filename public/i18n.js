@@ -5,12 +5,12 @@ export const translations = {
     intro: "A space to think, write, and figure things out.",
     explain: "Explain a concept", write: "Help me write", brainstorm: "Brainstorm ideas",
     prompts: { explain: "Explain a concept to me: ", write: "Help me write ", brainstorm: "Brainstorm ideas for " },
-    prompt: "Message Khat", attach: "Attach", search: "Search Wikipedia", voice: "Dictate",
+    prompt: "Message Khat", attach: "Attach", search: "Web research", voice: "Dictate",
     send: "Send", stop: "Stop", personality: "AI personality", memory: "Memory",
     privacy: "History and settings stay in this browser. Relevant chat text, memory, and attached text go to Workers AI when you send a message. Wikipedia receives your message as the search query when search is on.",
     cancel: "Cancel", save: "Save", deleteChat: "Delete conversation?", delete: "Delete",
     conversation: "Conversation", attachments: "Attachments", remove: "Remove",
-    sources: "Wikipedia sources", read: "Read aloud", stopReading: "Stop reading", copy: "Copy", code: "Code",
+    sources: "Sources", read: "Read aloud", stopReading: "Stop reading", copy: "Copy", code: "Code",
     copied: "Copied.", copyFailed: "Couldn’t access the clipboard.",
     listening: "Listening…", voiceFailed: "Dictation is unavailable or microphone access was denied.",
     voiceUnsupported: "Dictation is unavailable in this browser.",
@@ -20,7 +20,7 @@ export const translations = {
     invalid: "The message couldn’t be sent. Check its size and try again.",
     tooLarge: "The message and attachments are too long. Try shortening them or starting a new chat.",
     limited: "Too many requests. Try again in a minute.", unauthorized: "Reload to sign in again.",
-    searchFailed: "Wikipedia search is unavailable. Try again or turn search off.",
+    searchFailed: "Web research is unavailable. Try again or turn search off.",
     modelFailed: "Khat couldn’t finish the response. You can resend your message.",
     unavailable: "Khat is temporarily unavailable.",
     speechFailed: "Read aloud is unavailable.",
@@ -31,12 +31,12 @@ export const translations = {
     intro: "Et sted at tænke, skrive og finde svar.",
     explain: "Forklar et begreb", write: "Hjælp mig med at skrive", brainstorm: "Få idéer",
     prompts: { explain: "Forklar dette begreb for mig: ", write: "Hjælp mig med at skrive ", brainstorm: "Giv mig idéer til " },
-    prompt: "Skriv til Khat", attach: "Vedhæft", search: "Søg på Wikipedia", voice: "Diktér",
+    prompt: "Skriv til Khat", attach: "Vedhæft", search: "Websøgning", voice: "Diktér",
     send: "Send", stop: "Stop", personality: "AI-personlighed", memory: "Hukommelse",
     privacy: "Historik og indstillinger gemmes i denne browser. Relevant chattekst, hukommelse og vedhæftet tekst sendes til Workers AI. Når søgning er slået til, bruges din besked som søgning på Wikipedia.",
     cancel: "Annuller", save: "Gem", deleteChat: "Slet samtalen?", delete: "Slet",
     conversation: "Samtale", attachments: "Vedhæftede filer", remove: "Fjern",
-    sources: "Kilder fra Wikipedia", read: "Læs op", stopReading: "Stop oplæsning", copy: "Kopiér", code: "Kode",
+    sources: "Kilder", read: "Læs op", stopReading: "Stop oplæsning", copy: "Kopiér", code: "Kode",
     copied: "Kopieret.", copyFailed: "Kunne ikke få adgang til udklipsholderen.",
     listening: "Lytter…", voiceFailed: "Diktering er utilgængelig, eller mikrofonadgang blev afvist.",
     voiceUnsupported: "Diktering er utilgængelig i denne browser.",
@@ -46,7 +46,7 @@ export const translations = {
     invalid: "Beskeden kunne ikke sendes. Tjek længden, og prøv igen.",
     tooLarge: "Beskeden og filerne fylder for meget. Forkort dem, eller start en ny chat.",
     limited: "For mange forespørgsler. Prøv igen om et minut.", unauthorized: "Genindlæs siden for at logge ind igen.",
-    searchFailed: "Wikipedia-søgning er utilgængelig. Prøv igen, eller slå søgning fra.",
+    searchFailed: "Websøgning er utilgængelig. Prøv igen, eller slå søgning fra.",
     modelFailed: "Khat kunne ikke færdiggøre svaret. Du kan sende beskeden igen.",
     unavailable: "Khat er midlertidigt utilgængelig.",
     speechFailed: "Oplæsning er utilgængelig.",
@@ -106,7 +106,7 @@ Object.assign(translations.da, {
 });
 
 Object.assign(translations.en, {
-  accountPrivacy: "Chats and preferences sync to your account. Relevant messages, opted-in memories, and attachments are sent to Workers AI. Wikipedia receives the search query when enabled.",
+  accountPrivacy: "Chats and preferences sync to your account. Relevant messages, opted-in memories, and attachments are sent to Workers AI. Tavily or Wikipedia receives a short query from your current message when search is enabled.",
   brandDescription: "A more personal approach to artificial intelligence. Thoughtfully designed for curious minds, creative thinking and everyday discovery.",
   accountWelcome: "Your space to think.", accountIntro: "Sign in to pick up your conversations on any device.",
   registerTitle: "Make it yours.", username: "Username", accountPassword: "Password", invite: "Invitation code",
@@ -132,7 +132,7 @@ Object.assign(translations.en, {
 });
 
 Object.assign(translations.da, {
-  accountPrivacy: "Samtaler og indstillinger synkroniseres med din konto. Relevante beskeder, aktiverede minder og filer sendes til Workers AI. Wikipedia modtager søgningen, når den er slået til.",
+  accountPrivacy: "Samtaler og indstillinger synkroniseres med din konto. Relevante beskeder, aktiverede minder og filer sendes til Workers AI. Tavily eller Wikipedia modtager en kort forespørgsel fra din aktuelle besked, når søgning er slået til.",
   brandDescription: "En mere personlig tilgang til kunstig intelligens. Skabt med omtanke til nysgerrige mennesker, kreativ tænkning og hverdagens opdagelser.",
   accountWelcome: "Dit sted at tænke.", accountIntro: "Log ind for at fortsætte dine samtaler på alle dine enheder.",
   registerTitle: "Gør Khat til dit.", username: "Brugernavn", accountPassword: "Adgangskode", invite: "Invitationskode",
@@ -285,3 +285,17 @@ export function conversationLanguage(text, history = []) {
   }
   return "en";
 }
+
+
+Object.assign(translations.en, {
+  searchOff: "Search off", searchAuto: "Auto search", searchQuick: "Quick search",
+  searchAdvanced: "Advanced research", searchDeep: "Deep research",
+  searchDisclosure: "When enabled, Khat may send a short query from your current message to Tavily or Wikipedia. Temporary chats use Wikipedia only.",
+  wikiFallback: "This answer used Wikipedia search.",
+});
+Object.assign(translations.da, {
+  searchOff: "Søgning fra", searchAuto: "Automatisk søgning", searchQuick: "Hurtig søgning",
+  searchAdvanced: "Avanceret søgning", searchDeep: "Dybdegående søgning",
+  searchDisclosure: "Når søgning er slået til, kan Khat sende en kort forespørgsel fra din aktuelle besked til Tavily eller Wikipedia. Midlertidige chats bruger kun Wikipedia.",
+  wikiFallback: "Svaret brugte søgning på Wikipedia.",
+});
