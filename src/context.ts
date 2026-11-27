@@ -11,7 +11,7 @@ export function contextWindow(history: Turn[]) {
 	const summary = history.slice(0, -6).map((turn, position) => ({
 		turn, position,
 		score: [...terms(turn.content)].filter(term => query.has(term)).length,
-	})).sort((a, b) => b.score - a.score || b.position - a.position)
+	})).filter(item => item.score > 0).sort((a, b) => b.score - a.score || b.position - a.position)
 		.slice(0, 4).sort((a, b) => a.position - b.position)
 		.map(({ turn, score }) => {
 			const sentences = turn.content.match(/[^.!?\n]+[.!?]?/g) ?? [turn.content];
@@ -24,7 +24,7 @@ export function contextWindow(history: Turn[]) {
 }
 
 export function calculate(prompt: string) {
-	const expression = prompt.trim().replace(/^(?:calculate|beregn)\s*:\s*/i, "").replace(/[×÷−]/g, sign => ({ "×": "*", "÷": "/", "−": "-" }[sign]!));
+	const expression = prompt.trim().replace(/^(?:calculate|beregn|hvad er|what is)\b\s*:?\s*/i, "").replace(/\?$/, "").replace(/(\d),(?=\d)/g, "$1.").replace(/[×÷−]/g, sign => ({ "×": "*", "÷": "/", "−": "-" }[sign]!));
 	if (!/^[\d.()+*/\s-]{1,100}$/.test(expression) || !/[+*/-]/.test(expression)) return null;
 	const tokens = expression.match(/\d+(?:\.\d+)?|\.\d+|[()+*/-]/g) ?? [];
 	if (tokens.join("") !== expression.replace(/\s/g, "")) return null;
