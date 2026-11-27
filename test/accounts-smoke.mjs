@@ -222,6 +222,32 @@ try {
     await page.locator("#welcome h1").waitFor();
     assert.equal(await page.locator("#account-auth").isVisible(), false);
     assert.equal(browserGalleryReads, 0);
+    await page.locator("#settings").click();
+    await page.locator("#tab-appearance-settings").click();
+    await page.getByLabel("Language", { exact: true }).selectOption("da");
+    await page.waitForFunction(() => document.documentElement.lang === "da");
+    await page.locator('#preferences [value="cancel"]').last().click();
+    await page.waitForFunction(() => document.documentElement.lang === "en");
+
+    await page.locator("#settings").click();
+    await page.locator("#tab-appearance-settings").click();
+    await page.locator("#preferred-language").selectOption("da");
+    await page.locator('#preferences [value="save"]').click();
+    await page.locator("#preferences").waitFor({ state: "hidden" });
+    assert.equal((await read(admin)).preferences.language, "da");
+    await page.reload();
+    await page.waitForFunction(() => document.documentElement.lang === "da");
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    }
+    await page.locator("#settings").click();
+    await page.locator("#tab-appearance-settings").click();
+    await page.locator("#preferred-language").selectOption("auto");
+    await page.locator('#preferences [value="save"]').click();
+    await page.locator("#preferences").waitFor({ state: "hidden" });
+    assert.equal((await read(admin)).preferences.language, "auto");
+    assert.equal(await page.locator("html").getAttribute("lang"), "en");
     const expected = [];
     const checks = [];
     await page.route("**/api/chat", async route => {
@@ -275,6 +301,7 @@ try {
     assert.equal(await page.locator("#chat-title").isVisible(), false);
     await send("hvad er mit navn?");
     assert.equal(expected.at(-1).temporary, true);
+    assert.equal(expected.at(-1).language, "da");
     assert.equal(expected.at(-1).memory, undefined);
     assert.equal(expected.at(-1).instructions, undefined);
     const afterTemporary = await read(admin);
